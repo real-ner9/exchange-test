@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { TextInput } from '@gravity-ui/uikit'
 import { api, type InitiatorTask } from '../../api'
-import { Counters, DataTable, Field, ErrorNote, fmtDate, fmtMoney, Loading, PageHead, usePolling, type Column } from '../../ui'
+import { DataTable, Field, Stats, TextInput, type Column } from '../../components'
+import { ErrorNote, fmtDate, fmtMoney, Loading, PageHead, usePolling } from '../../ui'
 
 type ReportResponse = { from: string; to: string; count: number; items: InitiatorTask[] }
 
@@ -38,14 +38,14 @@ export default function Report() {
       />
       <div className="toolbar">
         <Field id="from" label="С">
-          <TextInput id="from" value={from} onUpdate={setFrom} controlProps={{ type: 'date' }} />
+          <TextInput id="from" type="date" value={from} onChange={setFrom} />
         </Field>
         <Field id="to" label="По">
-          <TextInput id="to" value={to} onUpdate={setTo} controlProps={{ type: 'date' }} />
+          <TextInput id="to" type="date" value={to} onChange={setTo} />
         </Field>
       </div>
       {data && (
-        <Counters
+        <Stats
           items={[
             { label: 'Выполнено заданий', value: data.count.toLocaleString('ru-RU') },
             { label: 'На сумму', value: fmtMoney(total) },

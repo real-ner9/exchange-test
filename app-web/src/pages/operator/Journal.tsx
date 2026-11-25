@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Select, Text } from '@gravity-ui/uikit'
 import { api, type TaskEvent } from '../../api'
+import { DataTable, Pagination, Select, type Column } from '../../components'
 import { EVENT_LABELS } from '../../labels'
-import { DataTable, ErrorNote, fmtDate, Loading, PageHead, Pager, usePolling, type Column } from '../../ui'
+import { ErrorNote, fmtDate, Loading, PageHead, usePolling } from '../../ui'
 import { EventsTable } from './OpTask'
 
 type Invalid = { id: number; receivedAt: string; raw: string; error: string }
+
+const EVENT_OPTIONS = Object.entries(EVENT_LABELS).map(([value, label]) => ({ value, label }))
 
 const INVALID_COLUMNS: Column<Invalid>[] = [
   { id: 'at', header: 'Получено', width: 150, nowrap: true, cell: (m) => fmtDate(m.receivedAt) },
@@ -31,12 +33,11 @@ export default function Journal() {
       <div className="toolbar">
         <Select
           width={320}
-          value={kind ? [kind] : []}
+          value={kind}
           placeholder="Все события"
-          hasClear
-          options={Object.entries(EVENT_LABELS).map(([value, content]) => ({ value, content }))}
-          onUpdate={(v) => {
-            setKind(v[0] ?? '')
+          options={EVENT_OPTIONS}
+          onChange={(v) => {
+            setKind(v)
             setPage(0)
           }}
         />
@@ -44,23 +45,12 @@ export default function Journal() {
       <ErrorNote text={error} />
       {!data && !error && <Loading />}
       {data && <EventsTable events={data.items} showTask />}
-      {data && (
-        <Pager
-          page={page}
-          size={data.size}
-          total={data.items.length < data.size ? page * data.size + data.items.length : (page + 2) * data.size}
-          onPage={setPage}
-        />
-      )}
+      {data && <Pagination page={page} size={data.size} hasNext={data.items.length === data.size} onPage={setPage} />}
 
       {invalid.data && invalid.data.length > 0 && (
         <>
-          <Text as="h2" variant="subheader-2" className="section-title">
-            Неразобранные входящие сообщения
-          </Text>
-          <Text as="p" color="secondary" className="block">
-            Сообщения, которые не удалось разобрать. Сохранены как есть, статусы заданий не меняли.
-          </Text>
+          <h2 className="section-title">Неразобранные входящие сообщения</h2>
+          <p className="section-sub">Сообщения, которые не удалось разобрать. Сохранены как есть, статусы заданий не меняли.</p>
           <DataTable rows={invalid.data} columns={INVALID_COLUMNS} rowKey={(m) => String(m.id)} />
         </>
       )}

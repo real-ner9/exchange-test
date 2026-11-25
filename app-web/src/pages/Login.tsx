@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { Button, Text, TextInput } from '@gravity-ui/uikit'
 import { useAuth } from '../auth'
-import { ErrorNote, Field } from '../ui'
+import { Button, Field, TextInput } from '../components'
+import { ErrorNote } from '../ui'
 
 const DEMO = [
   { login: 'ivanov', name: 'Иванов И.', role: 'инициатор' },
@@ -39,41 +39,46 @@ export default function Login() {
 
   return (
     <div className="login">
-      <form className="login-form" onSubmit={onSubmit}>
-        <Text as="h1" variant="header-1">
-          Обмен заданиями — вход
-        </Text>
-        <Field id="login" label="Логин">
-          <TextInput id="login" value={name} onUpdate={setName} autoFocus autoComplete="username" size="l" />
-        </Field>
-        <Field id="password" label="Пароль">
-          <TextInput id="password" type="password" value={password} onUpdate={setPassword} autoComplete="current-password" size="l" />
-        </Field>
-        <ErrorNote text={error} />
-        <Button type="submit" view="action" size="l" width="max" loading={busy === name && !!name} disabled={!name || !password}>
-          Войти
-        </Button>
+      <div className="login-card">
+        <div className="brand login-brand">
+          <span className="brand-mark" aria-hidden>
+            ⇄
+          </span>
+          <span>Обмен заданиями</span>
+        </div>
+        <h1>Вход</h1>
+        <form className="form" onSubmit={onSubmit}>
+          <Field id="login" label="Логин">
+            <TextInput id="login" value={name} onChange={setName} autoFocus autoComplete="username" />
+          </Field>
+          <Field id="password" label="Пароль">
+            <TextInput id="password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
+          </Field>
+          <ErrorNote text={error} />
+          <Button type="submit" variant="primary" block loading={busy === name && !!name} disabled={!name || !password}>
+            Войти
+          </Button>
+        </form>
 
         <div className="login-demo">
-          <Text color="secondary">Демо-пользователи, пароль demo:</Text>
-          <table className="plain-table">
-            <tbody>
-              {DEMO.map((d) => (
-                <tr key={d.login}>
-                  <td className="mono">{d.login}</td>
-                  <td>{d.name}</td>
-                  <td className="muted">{d.role}</td>
-                  <td>
-                    <Button size="s" view="outlined" loading={busy === d.login} disabled={!!busy} onClick={() => submit(d.login, 'demo')}>
-                      Войти
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="login-demo-title">Демо-пользователи · пароль demo</div>
+          <ul>
+            {DEMO.map((d) => (
+              <li key={d.login}>
+                <span className="login-demo-who">
+                  {d.name}
+                  <span className="muted">
+                    <span className="mono">{d.login}</span> · {d.role}
+                  </span>
+                </span>
+                <Button size="sm" loading={busy === d.login} disabled={!!busy} onClick={() => submit(d.login, 'demo')}>
+                  Войти
+                </Button>
+              </li>
+            ))}
+          </ul>
         </div>
-      </form>
+      </div>
     </div>
   )
 }

@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Button, Checkbox, Switch, Text, TextInput } from '@gravity-ui/uikit'
 import { api, type Fault } from '../../api'
+import { Button, Checkbox, Stats, Switch, TextInput, useToast } from '../../components'
 import { FAULT_LABELS } from '../../labels'
-import { Counters, ErrorNote, PageHead, useToast, usePolling } from '../../ui'
+import { ErrorNote, PageHead, usePolling } from '../../ui'
 
-type Stats = {
+type EmuStats = {
   operations: number
   pending: number
   executions: number
@@ -15,7 +15,7 @@ type Stats = {
 
 export default function Demo() {
   const faults = usePolling(() => api.get<Fault[]>('/api/operator/demo/faults'), [], 3000)
-  const stats = usePolling(() => api.get<Stats>('/api/operator/demo/stats'), [], 3000)
+  const stats = usePolling(() => api.get<EmuStats>('/api/operator/demo/stats'), [], 3000)
   const [error, setError] = useState<string | null>(null)
   const toast = useToast()
 
@@ -38,14 +38,12 @@ export default function Demo() {
         title="Демо-панель: сбои внешней системы"
         sub="Режимы переключаются в отдельном эмуляторе внешнего сервиса (своя БД, свой процесс). Основное приложение о них не знает и видит только последствия."
       >
-        <Button view="outlined" onClick={() => set({ reset: true }, 'Все сбои выключены')}>
-          Выключить все сбои
-        </Button>
+        <Button onClick={() => set({ reset: true }, 'Все сбои выключены')}>Выключить все сбои</Button>
       </PageHead>
       <ErrorNote text={error ?? faults.error} />
 
       {s && (
-        <Counters
+        <Stats
           items={[
             { label: 'Операций у эмулятора', value: n(s.operations) },
             { label: 'Получено отправок (с повторами)', value: n(s.receivedAttempts) },
@@ -56,25 +54,25 @@ export default function Demo() {
         />
       )}
 
-      <table className="plain-table faults block">
-        <thead>
-          <tr>
-            <th>Режим</th>
-            <th>Что происходит</th>
-            <th>Параметры</th>
-            <th>Включён</th>
-          </tr>
-        </thead>
-        <tbody>
-          {faults.data?.map((f) => (
-            <FaultRow key={f.mode} fault={f} onChange={set} />
-          ))}
-        </tbody>
-      </table>
+      <div className="table-wrap block">
+        <table className="table faults">
+          <thead>
+            <tr>
+              <th>Режим</th>
+              <th>Что происходит</th>
+              <th>Параметры</th>
+              <th>Включён</th>
+            </tr>
+          </thead>
+          <tbody>
+            {faults.data?.map((f) => (
+              <FaultRow key={f.mode} fault={f} onChange={set} />
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <Text as="h2" variant="subheader-2" className="section-title">
-        Сценарии для демонстрации
-      </Text>
+      <h2 className="section-title">Сценарии для демонстрации</h2>
       <ol className="scenarios">
         <li>
           <b>Недоступность.</b> Включите «Недоступность», создайте задание от инициатора: оно «Отправляется», у оператора — в
@@ -108,17 +106,17 @@ function FaultRow({ fault, onChange }: { fault: Fault; onChange: (body: unknown,
   const setParam = (key: string, value: unknown) => onChange({ mode: fault.mode, enabled: fault.enabled, params: { [key]: value } })
 
   return (
-    <tr className={fault.enabled ? 'fault-on' : ''}>
+    <tr className={fault.enabled ? 'fault-on' : undefined}>
       <td>
-        {meta.title}
+        <span className="strong">{meta.title}</span>
         <div className="mono muted">{fault.mode}</div>
       </td>
       <td>{meta.text}</td>
       <td className="fault-params">
         {fault.mode === 'lose_response' && (
           <TextInput
-            size="s"
-            label="зависание, с"
+            size="sm"
+            prefix="зависание, с"
             type="number"
             defaultValue={String(p.hangSeconds ?? 15)}
             onBlur={(e) => setParam('hangSeconds', Number(e.target.value))}
@@ -127,28 +125,28 @@ function FaultRow({ fault, onChange }: { fault: Fault; onChange: (body: unknown,
         {fault.mode === 'delay_result' && (
           <>
             <TextInput
-              size="s"
-              label="задержка, с"
+              size="sm"
+              prefix="задержка, с"
               type="number"
               defaultValue={String(p.seconds ?? 10)}
               onBlur={(e) => setParam('seconds', Number(e.target.value))}
             />
-            <Checkbox checked={p.reorder !== false} onUpdate={(v) => setParam('reorder', v)}>
+            <Checkbox checked={p.reorder !== false} onChange={(v) => setParam('reorder', v)}>
               переставлять порядок
             </Checkbox>
           </>
         )}
         {(fault.mode === 'reject_content' || fault.mode === 'fail_execution') && (
           <TextInput
-            size="s"
-            label="маркер в названии"
+            size="sm"
+            prefix="маркер"
             defaultValue={String(p.marker ?? '')}
             onBlur={(e) => setParam('marker', e.target.value)}
           />
         )}
       </td>
       <td>
-        <Switch checked={fault.enabled} onUpdate={toggle} content={fault.enabled ? 'вкл' : 'выкл'} />
+        <Switch checked={fault.enabled} onChange={toggle} label={fault.enabled ? 'вкл' : 'выкл'} />
       </td>
     </tr>
   )

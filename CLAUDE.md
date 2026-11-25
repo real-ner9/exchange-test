@@ -26,9 +26,9 @@ tests,"в каждом модуле: Testcontainers PostgreSQL: идемпоте
 ```
 
 ## UI
-- Компоненты Gravity UI 8 (`@gravity-ui/uikit`, `@gravity-ui/table`); свой CSS — только раскладка на переменных `--g-*`.
+- Без UI-библиотек: свои компоненты в `app-web/src/components` (Button, TextInput, Select, Segmented, Badge, Notice, Dialog, Toast, DataTable, Pagination, Props, Stats); стили — `src/index.css` на переменных из `:root`.
 - Рабочий инструмент: без анимаций появления, пульсаций, счётчиков-«накруток», градиентов, свечений, эмодзи. Движение — только hover/focus внутри компонентов.
-- Статус — текстом (`StatusLabel`), числа — вправо с `tabular-nums`, таблицы — через `DataTable` из `ui.tsx`.
+- Статус — текстом (`StatusLabel`), числа — вправо с `tabular-nums`, таблицы — через `DataTable`.
 - После правок UI: `npm run check:style` и скриншоты экранов через Playwright.
 
 ## Порядок работы

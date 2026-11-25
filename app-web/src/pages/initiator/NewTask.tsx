@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Alert, Button, Text, TextArea, TextInput } from '@gravity-ui/uikit'
 import { api, ApiError, type InitiatorTask } from '../../api'
-import { ErrorNote, Field, fmtAgo, PageHead } from '../../ui'
+import { Button, Field, Notice, TextArea, TextInput } from '../../components'
+import { ErrorNote, fmtAgo, PageHead } from '../../ui'
 
 type Prefill = { title?: string; amount?: number | null; comment?: string | null }
 
@@ -53,55 +53,46 @@ export default function NewTask() {
 
   return (
     <section className="narrow">
-      <PageHead title="Новое задание" />
-      <form className="form" onSubmit={submit}>
+      <PageHead title="Новое задание" back={<Link to="/tasks">← Мои задания</Link>} />
+      <form className="panel form" onSubmit={submit}>
         <Field id="title" label="Что сделать">
-          <TextInput id="title" value={title} onUpdate={setTitle} onBlur={checkSimilar} controlProps={{ maxLength: 200, required: true }} />
+          <TextInput id="title" value={title} onChange={setTitle} onBlur={checkSimilar} maxLength={200} required />
         </Field>
-        <Field id="amount" label="Сумма, ₽ (необязательно)">
-          <TextInput id="amount" value={amount} onUpdate={setAmount} controlProps={{ inputMode: 'decimal' }} />
+        <Field id="amount" label="Сумма, ₽" hint="Необязательно">
+          <TextInput id="amount" value={amount} onChange={setAmount} inputMode="decimal" className="input-amount" />
         </Field>
         <Field id="comment" label="Комментарий">
-          <TextArea id="comment" value={comment} onUpdate={setComment} minRows={3} controlProps={{ maxLength: 1000 }} />
+          <TextArea id="comment" value={comment} onChange={setComment} rows={3} maxLength={1000} />
         </Field>
 
         {similar.length > 0 && (
-          <Alert
-            theme="warning"
-            view="outlined"
-            title="Похожее задание уже создано недавно"
-            message={
-              <>
-                <ul className="plain-list">
-                  {similar.map((s) => (
-                    <li key={s.id}>
-                      <Link to={'/tasks/' + s.id} target="_blank">
-                        {s.title}
-                      </Link>{' '}
-                      — {fmtAgo(s.createdAt)}, {s.status.label.toLowerCase()}
-                    </li>
-                  ))}
-                </ul>
-                Если это другое поручение — создавайте. Если то же самое — новое задание не нужно.
-              </>
-            }
-          />
+          <Notice tone="warning" title="Похожее задание уже создано недавно">
+            <ul className="plain-list">
+              {similar.map((s) => (
+                <li key={s.id}>
+                  <Link to={'/tasks/' + s.id} target="_blank">
+                    {s.title}
+                  </Link>{' '}
+                  — {fmtAgo(s.createdAt)}, {s.status.label.toLowerCase()}
+                </li>
+              ))}
+            </ul>
+            Если это другое поручение — создавайте. Если то же самое — новое задание не нужно.
+          </Notice>
         )}
 
         <ErrorNote text={error} />
         <div className="actions">
-          <Button type="submit" view="action" loading={busy} disabled={!title.trim()}>
+          <Button type="submit" variant="primary" loading={busy} disabled={!title.trim()}>
             Создать
           </Button>
-          <Button view="outlined" onClick={() => navigate('/tasks')}>
-            Отмена
-          </Button>
+          <Button onClick={() => navigate('/tasks')}>Отмена</Button>
         </div>
-        <Text color="secondary">
-          Для демо: «#reject» в названии — внешняя система отвергнет содержание, «#fail» — исполнит с отказом (если
-          оператор включил эти режимы).
-        </Text>
       </form>
+      <p className="footnote">
+        Для демо: «#reject» в названии — внешняя система отвергнет содержание, «#fail» — исполнит с отказом (если оператор
+        включил эти режимы).
+      </p>
     </section>
   )
 }
