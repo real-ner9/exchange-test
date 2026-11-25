@@ -31,3 +31,17 @@ tests,"в каждом модуле: Testcontainers PostgreSQL: идемпоте
 3. Создание задания + outbox + отправщик + приём результатов.
 4. Экран инициатора, экран оператора, сверка.
 5. Тесты на правила из `docs/decisions.md`, нагрузочный прогон, README.
+
+Статус: шаги 1–5 выполнены (25.11.2026). Осталось только сдать: итоговый коммит, push, `python scripts/pack_sessions.py --repo-url <URL>`.
+
+## Команды
+```
+commands[6]{what,command}
+"весь стек","docker compose up -d --build (web :8080, api :4000, emulator :4100, БД :5442/:5443)"
+"тесты api","cd app-api && JAVA_HOME=<jdk21> ./mvnw test"
+"тесты эмулятора","cd emulator && JAVA_HOME=<jdk21> ./mvnw test"
+"данные 5000","MSYS_NO_PATHCONV=1 docker compose --profile load run --rm k6 run /scripts/seed.js"
+"нагрузка","MSYS_NO_PATHCONV=1 docker compose --profile load run --rm k6 run /scripts/load.js"
+"архив сессий","python scripts/pack_sessions.py --repo-url <URL>"
+```
+Порт 5432 на машине занят другим проектом — поэтому БД на 5442/5443.

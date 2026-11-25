@@ -119,6 +119,21 @@ class EmulatorApplicationTests {
         assertThat(op).containsEntry("outcome", "FAILED").containsEntry("version", 2);
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void listForReconciliationReturnsOperationsUpdatedSince() throws Exception {
+        java.time.Instant before = java.time.Instant.now().minusSeconds(1);
+        UUID key = UUID.randomUUID();
+        submit(key, "для сверки");
+        awaitStatus(key, "EXECUTED");
+
+        Map<String, Object> page = http.get().uri("/operations?updatedSince={s}&limit=1000", before)
+                .retrieve().body(Map.class);
+        var items = (List<Map<String, Object>>) page.get("items");
+        assertThat(items).extracting(m -> m.get("operationKey")).contains(key.toString());
+        assertThat(page.get("nextSince")).isNotNull();
+    }
+
     // --- helpers ---
 
     @SuppressWarnings("unchecked")
