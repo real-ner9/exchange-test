@@ -1,26 +1,43 @@
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, type InitiatorTask } from '../../api'
-import { Badge, ErrorNote, fmtDate, fmtMoney, usePolling } from '../../ui'
+import { Badge, ErrorNote, fmtDate, fmtMoney, SkeletonCard, StatusStepper, usePolling } from '../../ui'
+import { LIVE_CODES } from './MyTasks'
 
 export default function TaskView() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: t, error } = usePolling(() => api.get<InitiatorTask>('/api/tasks/' + id), [id])
 
-  if (error) return <ErrorNote text={error} />
-  if (!t) return <div className="muted">Загрузка…</div>
+  if (error && !t) return <ErrorNote text={error} />
+  if (!t)
+    return (
+      <section className="narrow">
+        <SkeletonCard />
+      </section>
+    )
 
+  const tone = t.status.needsAction ? 'note-warn' : t.status.code === 'COMPLETED' ? 'note-success' : 'note-info'
   return (
     <section className="narrow">
       <Link to="/tasks" className="back">
         ← Мои задания
       </Link>
-      <div className="card">
+      <div className="card hero-card">
         <div className="page-head">
-          <h2>{t.title}</h2>
-          <Badge tone={t.status.color}>{t.status.label}</Badge>
+          <div>
+            <h2>{t.title}</h2>
+            <div className="muted small">создано {fmtDate(t.createdAt)}</div>
+          </div>
+          <Badge tone={t.status.color} live={LIVE_CODES.has(t.status.code)}>
+            <span key={t.status.code} className="pop">
+              {t.status.label}
+            </span>
+          </Badge>
         </div>
-        <div className={'note ' + (t.status.needsAction ? 'note-warn' : 'note-info')}>
+
+        <StatusStepper code={t.status.code} />
+
+        <div className={'note ' + tone} key={t.status.code}>
           {t.status.needsAction && <div className="strong">Требуется ваше действие</div>}
           {t.status.hint}
           {t.problem && <div className="problem">Причина: {t.problem}</div>}
@@ -36,27 +53,32 @@ export default function TaskView() {
             Создать исправленное задание
           </button>
         )}
-        <dl className="fields">
-          <dt>Сумма</dt>
-          <dd>{fmtMoney(t.payload.amount)}</dd>
-          <dt>Комментарий</dt>
-          <dd>{t.payload.comment || '—'}</dd>
-          <dt>Создано</dt>
-          <dd>{fmtDate(t.createdAt)}</dd>
-          <dt>Выполнено</dt>
-          <dd>{fmtDate(t.completedAt)}</dd>
-        </dl>
+
+        <div className="detail-grid">
+          <div className="detail">
+            <div className="detail-label">Сумма</div>
+            <div className="detail-value">{fmtMoney(t.payload.amount)}</div>
+          </div>
+          <div className="detail">
+            <div className="detail-label">Выполнено</div>
+            <div className="detail-value">{fmtDate(t.completedAt)}</div>
+          </div>
+          <div className="detail wide">
+            <div className="detail-label">Комментарий</div>
+            <div className="detail-value">{t.payload.comment || '—'}</div>
+          </div>
+        </div>
+
         <h3>История</h3>
         <ol className="timeline">
           {t.history?.map((h, i) => (
-            <li key={i}>
+            <li key={i} style={{ ['--i' as string]: i }}>
               <span className={'dot dot-' + h.color} />
+              <span className="tl-label">{h.label}</span>
               <span className="when">{fmtDate(h.at)}</span>
-              <span>{h.label}</span>
             </li>
           ))}
         </ol>
-        <div className="muted small">Страница обновляется сама.</div>
       </div>
     </section>
   )

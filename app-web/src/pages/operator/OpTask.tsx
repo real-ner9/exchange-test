@@ -12,7 +12,10 @@ import {
   STATUS_TONE,
   label,
 } from '../../labels'
-import { Badge, ErrorNote, fmtDate, fmtMoney, Modal, usePolling } from '../../ui'
+import { Badge, ErrorNote, fmtDate, fmtMoney, Modal, rowProps, SkeletonCard, useToast, usePolling } from '../../ui'
+
+const LIVE = new Set(['QUEUED', 'SENDING', 'RETRY_WAIT', 'ACCEPTED'])
+
 
 type Executions = { operationKey: string; status: string | null; executions: number; receivedAttempts: number }
 
@@ -25,9 +28,10 @@ export default function OpTask() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [exec, setExec] = useState<Executions | null>(null)
+  const toast = useToast()
 
   if (error && !t) return <ErrorNote text={error} />
-  if (!t) return <div className="muted">Загрузка…</div>
+  if (!t) return <SkeletonCard />
 
   async function act(kind: 'close' | 'retry') {
     if (!t) return
@@ -35,12 +39,14 @@ export default function OpTask() {
     setActionError(null)
     try {
       await api.post(`/api/operator/tasks/${t.id}/${kind}`, { version: t.version, reason })
+      toast(kind === 'close' ? 'Задание закрыто без подтверждения — записано в журнал' : 'Повтор поставлен в очередь — отправка начнётся сразу')
       setDialog(null)
       setReason('')
       await reload()
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setActionError(msg)
+      toast(msg, 'error')
       if (e instanceof ApiError && e.status === 409) await reload()
     } finally {
       setBusy(false)
@@ -69,7 +75,9 @@ export default function OpTask() {
               {t.initiator} · создано {fmtDate(t.createdAt)} · инициатор видит: «{t.userStatus}»
             </div>
           </div>
-          <Badge tone={STATUS_TONE[t.status]}>{label(STATUS_LABELS, t.status)}</Badge>
+          <Badge tone={STATUS_TONE[t.status]} live={LIVE.has(t.status)}>
+            <span key={t.status} className="pop">{label(STATUS_LABELS, t.status)}</span>
+          </Badge>
         </div>
 
         {t.attentionReason && <div className="note note-warn">{label(ATTENTION_LABELS, t.attentionReason)}</div>}
@@ -96,7 +104,7 @@ export default function OpTask() {
             Сколько раз исполнено?
           </button>
           {exec && (
-            <span className={exec.executions > 1 ? 'warn-text strong' : 'muted'}>
+            <span className={'exec-chip ' + (exec.executions > 1 ? 'exec-bad' : 'exec-ok')} key={exec.receivedAttempts + '-' + exec.executions}>
               Эмулятор: исполнений {exec.executions}, получено отправок {exec.receivedAttempts}, статус {exec.status ?? 'нет операции'}
             </span>
           )}
@@ -148,6 +156,7 @@ export default function OpTask() {
           </button>
         </div>
 
+        <div className="tab-body" key={tab}>
         {tab === 'events' && <EventsTable events={t.events} />}
         {tab === 'attempts' && (
           <table className="table">
@@ -162,8 +171,8 @@ export default function OpTask() {
               </tr>
             </thead>
             <tbody>
-              {t.attempts.map((a) => (
-                <tr key={a.attemptId}>
+              {t.attempts.map((a, i) => (
+                <tr key={a.attemptId} {...rowProps(i, false)}>
                   <td>{fmtDate(a.startedAt)}</td>
                   <td>{a.trigger === 'MANUAL' ? 'вручную' : 'авто'}</td>
                   <td>{a.outcome ? label(ATTEMPT_LABELS, a.outcome) : 'в процессе…'}</td>
@@ -190,8 +199,8 @@ export default function OpTask() {
               </tr>
             </thead>
             <tbody>
-              {t.results.map((r) => (
-                <tr key={r.resultId}>
+              {t.results.map((r, i) => (
+                <tr key={r.resultId} {...rowProps(i, false)}>
                   <td>{fmtDate(r.receivedAt)}</td>
                   <td>{r.version}</td>
                   <td>{r.outcome}</td>
@@ -202,6 +211,7 @@ export default function OpTask() {
             </tbody>
           </table>
         )}
+      </div>
       </div>
 
       {dialog === 'close' && (
@@ -265,8 +275,8 @@ export function EventsTable({ events, showTask }: { events: TaskEvent[]; showTas
         </tr>
       </thead>
       <tbody>
-        {events.map((e) => (
-          <tr key={e.id}>
+        {events.map((e, i) => (
+          <tr key={e.id} {...rowProps(i, false)}>
             <td className="nowrap">{fmtDate(e.at)}</td>
             {showTask && (
               <td>

@@ -52,7 +52,12 @@ export default function NewTask() {
 
   return (
     <section className="narrow">
-      <h2>Новое задание</h2>
+      <div className="page-head">
+        <div>
+          <h2>Новое задание</h2>
+          <p className="subtitle">Повторное нажатие «Создать» не создаст дубль — защита на сервере.</p>
+        </div>
+      </div>
       <form className="card form" onSubmit={submit}>
         <label>
           Что нужно сделать *
@@ -68,7 +73,7 @@ export default function NewTask() {
         </label>
 
         {similar.length > 0 && (
-          <div className="note note-warn">
+          <div className="note note-warn attention-in">
             <div className="strong">Похожее задание уже создано недавно:</div>
             <ul>
               {similar.map((s) => (
@@ -87,13 +92,14 @@ export default function NewTask() {
         <ErrorNote text={error} />
         <div className="actions">
           <button type="submit" disabled={busy || !title.trim()}>
+            {busy && <span className="spinner" />}
             {busy ? 'Создаём…' : 'Создать'}
           </button>
           <Link to="/tasks" className="button secondary">
             Отмена
           </Link>
         </div>
-        <div className="muted small">
+        <div className="hint-box">
           Подсказка для демо: «#reject» в названии — внешняя система отвергнет содержание, «#fail» — исполнит с отказом
           (если оператор включил эти режимы).
         </div>

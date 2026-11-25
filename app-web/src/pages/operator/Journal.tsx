@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api, type TaskEvent } from '../../api'
 import { EVENT_LABELS } from '../../labels'
-import { ErrorNote, fmtDate, Pager, usePolling } from '../../ui'
+import { ErrorNote, fmtDate, Pager, SkeletonRows, usePolling } from '../../ui'
 import { EventsTable } from './OpTask'
 
 type Invalid = { id: number; receivedAt: string; raw: string; error: string }
@@ -17,8 +17,10 @@ export default function Journal() {
 
   return (
     <section>
-      <h2>Журнал обмена</h2>
-      <p className="muted">
+      <div className="page-head">
+        <h2>Журнал обмена</h2>
+      </div>
+      <p className="subtitle">
         Все значимые изменения: смены статусов, ответы и результаты внешней системы (включая повторные и устаревшие),
         действия операторов с причинами.
       </p>
@@ -33,7 +35,12 @@ export default function Journal() {
         </select>
       </div>
       <ErrorNote text={error} />
-      {data && <EventsTable events={data.items} showTask />}
+      {!data && !error && <SkeletonRows />}
+      {data && (
+        <div className="table-wrap" key={kind + page}>
+          <EventsTable events={data.items} showTask />
+        </div>
+      )}
       {data && <Pager page={page} size={data.size} total={data.items.length < data.size ? page * data.size + data.items.length : (page + 2) * data.size} onPage={setPage} />}
 
       {invalid.data && invalid.data.length > 0 && (

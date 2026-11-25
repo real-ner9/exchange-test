@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { api, type Discrepancy, type ReconcileRun } from '../../api'
 import { DISCREPANCY_LABELS, STATUS_LABELS, label } from '../../labels'
-import { Badge, Empty, ErrorNote, fmtDate, Modal, usePolling } from '../../ui'
+import { Badge, Empty, ErrorNote, fmtDate, Modal, rowProps, SkeletonRows, useToast, usePolling } from '../../ui'
 
 const ACTIONS: Record<string, string> = {
   RESEND: 'Переотправить',
@@ -18,12 +18,14 @@ export default function Reconcile() {
   const [error, setError] = useState<string | null>(null)
   const [resolving, setResolving] = useState<{ d: Discrepancy; action: string } | null>(null)
   const [comment, setComment] = useState('')
+  const toast = useToast()
 
   async function run() {
     setBusy(true)
     setError(null)
     try {
-      await api.post('/api/operator/reconcile')
+      const r = await api.post<ReconcileRun>('/api/operator/reconcile')
+      toast(r.error ? 'Сверка не выполнена: ' + r.error : `Сверка №${r.id}: проверено ${r.checked}, расхождений ${r.mismatches}`, r.error ? 'error' : 'ok')
       await Promise.all([runs.reload(), list.reload()])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -38,6 +40,7 @@ export default function Reconcile() {
     setError(null)
     try {
       await api.post(`/api/operator/discrepancies/${resolving.d.id}/resolve`, { action: resolving.action, comment })
+      toast('Решение записано: ' + ACTIONS[resolving.action].toLowerCase())
       setResolving(null)
       setComment('')
       await list.reload()
@@ -54,17 +57,18 @@ export default function Reconcile() {
       <div className="page-head">
         <h2>Сверка с внешней системой</h2>
         <button onClick={run} disabled={busy}>
+          {busy && <span className="spinner" />}
           {busy ? 'Сверяем…' : 'Запустить сверку'}
         </button>
       </div>
-      <p className="muted">
+      <p className="subtitle">
         Сверка сравнивает наши задания со списком операций внешней системы. Если у них состояние новее (ответ или результат
         потерялся), оно применяется автоматически и фиксируется. Остальные расхождения ждут решения оператора. Сверка также
         выполняется автоматически каждые 5 минут.
       </p>
       <ErrorNote text={error} />
       {last && (
-        <div className={'note ' + (last.error ? 'note-error' : 'note-info')}>
+        <div className={'note ' + (last.error ? 'note-error' : last.mismatches > 0 ? 'note-warn' : 'note-success')} key={last.id}>
           Последняя сверка №{last.id}: {fmtDate(last.startedAt)} ({last.startedBy}).{' '}
           {last.error ? last.error : `Проверено заданий: ${last.checked}, расхождений: ${last.mismatches}.`}
         </div>
@@ -78,8 +82,10 @@ export default function Reconcile() {
           Все, включая разобранные
         </button>
       </div>
-      {list.data && list.data.items.length === 0 && <Empty>Расхождений нет.</Empty>}
+      {!list.data && !list.error && <SkeletonRows rows={3} />}
+      {list.data && list.data.items.length === 0 && <Empty icon="🤝">Расхождений нет — системы согласованы.</Empty>}
       {list.data && list.data.items.length > 0 && (
+        <div className="table-wrap" key={String(open)}>
         <table className="table">
           <thead>
             <tr>
@@ -92,8 +98,8 @@ export default function Reconcile() {
             </tr>
           </thead>
           <tbody>
-            {list.data.items.map((d) => (
-              <tr key={d.id}>
+            {list.data.items.map((d, i) => (
+              <tr key={d.id} {...rowProps(i, false)}>
                 <td className="nowrap">{fmtDate(d.foundAt)}</td>
                 <td>
                   {d.taskId ? <Link to={'/op/tasks/' + d.taskId}>{d.taskTitle}</Link> : <span className="mono small">{d.operationKey.slice(0, 8)}…</span>}
@@ -128,6 +134,7 @@ export default function Reconcile() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {resolving && (

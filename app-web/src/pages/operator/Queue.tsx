@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { api, type OperatorTask, type Page } from '../../api'
 import { ATTENTION_LABELS, STATUS_LABELS, STATUS_TONE, label } from '../../labels'
-import { Badge, Empty, ErrorNote, fmtAgo, Pager, usePolling } from '../../ui'
+import { AnimatedNumber, Badge, Empty, ErrorNote, fmtAgo, Pager, rowProps, SkeletonRows, useChangedIds, usePolling } from '../../ui'
+
+const LIVE = new Set(['QUEUED', 'SENDING', 'RETRY_WAIT', 'ACCEPTED'])
+
 
 type Summary = {
   byStatus: Record<string, number>
@@ -34,10 +37,16 @@ export default function Queue() {
     [view, status, q, page],
   )
   const s = summary.data
+  const changed = useChangedIds(list.data?.items, (t) => t.id, (t) => t.status)
 
   return (
     <section>
-      <h2>Очередь обмена</h2>
+      <div className="page-head">
+        <div>
+          <h2>Очередь обмена</h2>
+          <p className="subtitle">Проблемы обмена, повторы и закрытые вручную задания. Обновляется каждые 3 секунды.</p>
+        </div>
+      </div>
       {s && (
         <div className="stats">
           <Stat title="Требуют внимания" value={s.attention} tone={s.attention > 0 ? 'red' : 'green'} onClick={() => setView('attention')} />
@@ -69,10 +78,12 @@ export default function Queue() {
         </select>
       </div>
       <ErrorNote text={list.error} />
+      {!list.data && !list.error && <SkeletonRows />}
       {list.data && list.data.items.length === 0 && (
-        <Empty>{view === 'attention' ? 'Проблем нет — очередь пуста.' : 'Ничего не найдено.'}</Empty>
+        <Empty icon={view === 'attention' ? '🎉' : '🔍'}>{view === 'attention' ? 'Проблем нет — очередь пуста.' : 'Ничего не найдено.'}</Empty>
       )}
       {list.data && list.data.items.length > 0 && (
+        <div className="table-wrap" key={view + status + page}>
         <table className="table clickable">
           <thead>
             <tr>
@@ -85,14 +96,14 @@ export default function Queue() {
             </tr>
           </thead>
           <tbody>
-            {list.data.items.map((t) => (
-              <tr key={t.id} onClick={() => navigate('/op/tasks/' + t.id)}>
+            {list.data.items.map((t, i) => (
+              <tr key={t.id} onClick={() => navigate('/op/tasks/' + t.id)} {...rowProps(i, changed.has(t.id))}>
                 <td>
                   <div className="strong">{t.title}</div>
                   <div className="small muted">{t.initiator}</div>
                 </td>
                 <td>
-                  <Badge tone={STATUS_TONE[t.status]}>{label(STATUS_LABELS, t.status)}</Badge>
+                  <Badge tone={STATUS_TONE[t.status]} live={LIVE.has(t.status)}>{label(STATUS_LABELS, t.status)}</Badge>
                   {t.attentionReason && <div className="small warn-text">{label(ATTENTION_LABELS, t.attentionReason)}</div>}
                 </td>
                 <td>{t.attemptsCount}</td>
@@ -103,6 +114,7 @@ export default function Queue() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       {list.data && <Pager page={page} size={list.data.size} total={list.data.total} onPage={setPage} />}
     </section>
@@ -113,8 +125,8 @@ function Stat({ title, value, tone, onClick, href }: { title: string; value: num
   const navigate = useNavigate()
   const act = onClick ?? (href ? () => navigate(href) : undefined)
   return (
-    <button className={'stat stat-' + tone} onClick={act} disabled={!act}>
-      <div className="stat-value">{value ?? 0}</div>
+    <button className={'stat stat-' + tone + (act ? ' stat-link' : '')} onClick={act} disabled={!act}>
+      <div className="stat-value"><AnimatedNumber value={value ?? 0} /></div>
       <div className="stat-title">{title}</div>
     </button>
   )

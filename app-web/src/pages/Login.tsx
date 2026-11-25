@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
+import { Logo } from '../App'
 import { useAuth } from '../auth'
 import { ErrorNote } from '../ui'
 
 const DEMO = [
-  { login: 'ivanov', who: 'Иванов — инициатор' },
-  { login: 'petrova', who: 'Петрова — инициатор' },
-  { login: 'operator', who: 'Сидоров — оператор' },
-  { login: 'operator2', who: 'Кузнецова — оператор' },
+  { login: 'ivanov', name: 'Иванов И.', role: 'Инициатор', tone: 'in' },
+  { login: 'petrova', name: 'Петрова А.', role: 'Инициатор', tone: 'in' },
+  { login: 'operator', name: 'Сидоров С.', role: 'Оператор', tone: 'op' },
+  { login: 'operator2', name: 'Кузнецова Е.', role: 'Оператор', tone: 'op' },
 ]
 
 export default function Login() {
@@ -16,10 +17,10 @@ export default function Login() {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
 
   async function submit(l: string, p: string) {
-    setBusy(true)
+    setBusy(l)
     setError(null)
     try {
       const u = await login(l, p)
@@ -27,7 +28,7 @@ export default function Login() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
@@ -38,26 +39,52 @@ export default function Login() {
 
   return (
     <div className="login">
-      <form className="card login-card" onSubmit={onSubmit}>
+      <div className="login-glow g1" />
+      <div className="login-glow g2" />
+      <div className="login-side">
+        <Logo size={52} />
         <h1>Обмен заданиями</h1>
-        <p className="muted">Внутренняя система ↔ внешний сервис исполнения</p>
+        <p>Внутренняя система ↔ внешний сервис исполнения. Каждое задание — ровно одно исполнение, даже при сбоях связи.</p>
+        <ul className="login-points">
+          <li>Статус задания понятен без технических деталей</li>
+          <li>Повторы, потерянные ответы и дубли — под контролем</li>
+          <li>Сверка двух систем и журнал действий оператора</li>
+        </ul>
+      </div>
+      <form className="card login-card" onSubmit={onSubmit}>
+        <h2>Вход</h2>
         <label>
           Логин
-          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus autoComplete="username" />
         </label>
         <label>
           Пароль
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
         </label>
         <ErrorNote text={error} />
-        <button type="submit" disabled={busy || !name || !password}>
+        <button type="submit" className="wide" disabled={!!busy || !name || !password}>
+          {busy === name ? <span className="spinner" /> : null}
           Войти
         </button>
+        <div className="divider">
+          <span>или демо-пользователь · пароль demo</span>
+        </div>
         <div className="demo-users">
-          <div className="muted small">Демо-пользователи (пароль demo):</div>
-          {DEMO.map((d) => (
-            <button type="button" key={d.login} className="secondary" disabled={busy} onClick={() => submit(d.login, 'demo')}>
-              {d.who}
+          {DEMO.map((d, i) => (
+            <button
+              type="button"
+              key={d.login}
+              className="demo-user"
+              style={{ ['--i' as string]: i }}
+              disabled={!!busy}
+              onClick={() => submit(d.login, 'demo')}
+            >
+              <span className={'avatar avatar-' + d.tone}>{d.name[0]}</span>
+              <span className="demo-text">
+                <span className="strong">{d.name}</span>
+                <span className="small muted">{d.role}</span>
+              </span>
+              {busy === d.login ? <span className="spinner dark" /> : <span className="arrow">→</span>}
             </button>
           ))}
         </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { api, type InitiatorTask } from '../../api'
-import { Empty, ErrorNote, fmtDate, fmtMoney, usePolling } from '../../ui'
+import { AnimatedNumber, Empty, ErrorNote, fmtDate, fmtMoney, rowProps, SkeletonRows, usePolling } from '../../ui'
 
 type ReportResponse = { from: string; to: string; count: number; items: InitiatorTask[] }
 
@@ -24,7 +24,9 @@ export default function Report() {
 
   return (
     <section>
-      <h2>Отчёт о выполнении</h2>
+      <div className="page-head">
+        <h2>Отчёт о выполнении</h2>
+      </div>
       <div className="note note-info">
         В отчёт попадают только задания, по которым внешняя система сообщила о фактическом исполнении. Принятые в работу,
         закрытые оператором без подтверждения и отклонённые сюда не входят.
@@ -36,15 +38,24 @@ export default function Report() {
         <label>
           По <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
-        {data && (
-          <span className="muted">
-            Выполнено: <b>{data.count}</b>, на сумму <b>{fmtMoney(total)}</b>
-          </span>
-        )}
       </div>
+      {data && (
+        <div className="stats">
+          <div className="stat stat-green">
+            <div className="stat-value"><AnimatedNumber value={data.count} /></div>
+            <div className="stat-title">Выполнено заданий</div>
+          </div>
+          <div className="stat stat-blue">
+            <div className="stat-value small-value">{fmtMoney(total)}</div>
+            <div className="stat-title">На сумму</div>
+          </div>
+        </div>
+      )}
       <ErrorNote text={error} />
-      {data && data.items.length === 0 && <Empty>За период нет выполненных заданий.</Empty>}
+      {!data && !error && <SkeletonRows />}
+      {data && data.items.length === 0 && <Empty icon="📊">За период нет выполненных заданий.</Empty>}
       {data && data.items.length > 0 && (
+        <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
@@ -55,18 +66,19 @@ export default function Report() {
             </tr>
           </thead>
           <tbody>
-            {data.items.map((t) => (
-              <tr key={t.id}>
+            {data.items.map((t, i) => (
+              <tr key={t.id} {...rowProps(i, false)}>
                 <td>
                   <Link to={'/tasks/' + t.id}>{t.title}</Link>
                 </td>
-                <td>{fmtMoney(t.payload.amount)}</td>
+                <td className="num">{fmtMoney(t.payload.amount)}</td>
                 <td>{fmtDate(t.createdAt)}</td>
                 <td>{fmtDate(t.completedAt)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   )

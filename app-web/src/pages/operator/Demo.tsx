@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api, type Fault } from '../../api'
 import { FAULT_LABELS } from '../../labels'
-import { ErrorNote, usePolling } from '../../ui'
+import { AnimatedNumber, ErrorNote, useToast, usePolling } from '../../ui'
 
 type Stats = {
   operations: number
@@ -16,11 +16,13 @@ export default function Demo() {
   const faults = usePolling(() => api.get<Fault[]>('/api/operator/demo/faults'), [], 3000)
   const stats = usePolling(() => api.get<Stats>('/api/operator/demo/stats'), [], 3000)
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
 
-  async function set(body: unknown) {
+  async function set(body: unknown, message?: string) {
     setError(null)
     try {
       await api.post('/api/operator/demo/faults', body)
+      if (message) toast(message, 'info')
       await faults.reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -32,11 +34,11 @@ export default function Demo() {
     <section>
       <div className="page-head">
         <h2>Демо-панель: сбои внешней системы</h2>
-        <button className="secondary" onClick={() => set({ reset: true })}>
+        <button className="secondary" onClick={() => set({ reset: true }, 'Все сбои выключены')}>
           Выключить все сбои
         </button>
       </div>
-      <p className="muted">
+      <p className="subtitle">
         Режимы переключаются в отдельном эмуляторе внешнего сервиса (своя БД, свой процесс). Основное приложение о них не
         знает и видит только последствия.
       </p>
@@ -45,31 +47,31 @@ export default function Demo() {
       {s && (
         <div className="stats">
           <div className="stat stat-gray">
-            <div className="stat-value">{s.operations}</div>
+            <div className="stat-value"><AnimatedNumber value={s.operations} /></div>
             <div className="stat-title">Операций у эмулятора</div>
           </div>
           <div className="stat stat-gray">
-            <div className="stat-value">{s.receivedAttempts}</div>
+            <div className="stat-value"><AnimatedNumber value={s.receivedAttempts} /></div>
             <div className="stat-title">Получено отправок (с повторами)</div>
           </div>
           <div className="stat stat-green">
-            <div className="stat-value">{s.executions}</div>
+            <div className="stat-value"><AnimatedNumber value={s.executions} /></div>
             <div className="stat-title">Фактических исполнений</div>
           </div>
           <div className={'stat ' + (s.duplicateExecutions > 0 ? 'stat-red' : 'stat-green')}>
-            <div className="stat-value">{s.duplicateExecutions}</div>
+            <div className="stat-value"><AnimatedNumber value={s.duplicateExecutions} /></div>
             <div className="stat-title">Операций, исполненных дважды</div>
           </div>
           <div className="stat stat-gray">
-            <div className="stat-value">{s.undeliveredResults}</div>
+            <div className="stat-value"><AnimatedNumber value={s.undeliveredResults} /></div>
             <div className="stat-title">Недоставленных результатов</div>
           </div>
         </div>
       )}
 
       <div className="faults">
-        {faults.data?.map((f) => (
-          <FaultCard key={f.mode} fault={f} onChange={set} />
+        {faults.data?.map((f, i) => (
+          <FaultCard key={f.mode} index={i} fault={f} onChange={set} />
         ))}
       </div>
 
@@ -100,23 +102,24 @@ export default function Demo() {
   )
 }
 
-function FaultCard({ fault, onChange }: { fault: Fault; onChange: (body: unknown) => void }) {
+function FaultCard({ fault, onChange, index }: { fault: Fault; index: number; onChange: (body: unknown, message?: string) => void }) {
   const meta = FAULT_LABELS[fault.mode] ?? { title: fault.mode, text: '' }
   const p = fault.params
-  const toggle = () => onChange({ mode: fault.mode, enabled: !fault.enabled })
+  const toggle = () =>
+    onChange({ mode: fault.mode, enabled: !fault.enabled }, `${meta.title}: ${fault.enabled ? 'выключено' : 'включено'}`)
   const setParam = (key: string, value: unknown) => onChange({ mode: fault.mode, enabled: fault.enabled, params: { [key]: value } })
 
   return (
-    <div className={'card fault' + (fault.enabled ? ' on' : '')}>
+    <div className={'card fault' + (fault.enabled ? ' on' : '')} style={{ ['--i' as string]: index }}>
       <div className="fault-head">
         <div>
           <div className="strong">{meta.title}</div>
           <div className="mono small muted">{fault.mode}</div>
         </div>
-        <label className="switch">
-          <input type="checkbox" checked={fault.enabled} onChange={toggle} />
-          <span>{fault.enabled ? 'включён' : 'выключен'}</span>
-        </label>
+        <button type="button" role="switch" aria-checked={fault.enabled} className={'toggle' + (fault.enabled ? ' on' : '')} onClick={toggle}>
+          <span className="toggle-knob" />
+          <span className="toggle-text">{fault.enabled ? 'вкл' : 'выкл'}</span>
+        </button>
       </div>
       <div className="small">{meta.text}</div>
       <div className="fault-params">
