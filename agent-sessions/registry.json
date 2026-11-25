@@ -16,7 +16,7 @@
       "end": null,
       "task": "Review task, set up repo, DB schema and emulator contract",
       "outcome": "in_progress",
-      "commits": []
+      "commits": ["5bcd550de6ea140f0494323ea8b4ae4d27b45eaa"]
     }
   ]
 }
