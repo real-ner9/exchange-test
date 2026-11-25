@@ -29,7 +29,7 @@ FAILED,2,"исполнение завершилось отказом (outcome=FA
 endpoints[8]{method,path,purpose}
 POST,/operations,"отправка операции"
 GET,/operations/{operationKey},"статус одной операции (проверка после потерянного ответа)"
-GET,/operations?updatedSince=&limit=,"список для сверки, по возрастанию updatedAt"
+GET,/operations?updatedSince=&limit=,"список для сверки: updatedAt >= updatedSince (включительно, клиент убирает повторы на границе страниц), по возрастанию updatedAt"
 POST,{callbackUrl}/results,"эмулятор → app-api: сообщение о результате"
 GET,/admin/faults,"текущие режимы сбоев"
 POST,/admin/faults,"включить/выключить режимы сбоев"

@@ -44,6 +44,10 @@ CREATE INDEX tasks_similar_idx ON tasks (initiator_id, title, created_at DESC);
 CREATE TABLE outbox (
   id            bigserial PRIMARY KEY,
   task_id       uuid NOT NULL REFERENCES tasks(id),
+  trigger       text NOT NULL DEFAULT 'AUTO' CHECK (trigger IN ('AUTO', 'MANUAL')),
+  requested_by  uuid REFERENCES users(id),
+  -- когда строку можно брать; на время отправки сдвигается вперёд (аренда),
+  -- поэтому упавший посреди отправки воркер не блокирует задание навсегда
   available_at  timestamptz NOT NULL DEFAULT now(),
   processed_at  timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now()
@@ -60,7 +64,7 @@ CREATE TABLE attempts (
   trigger       text NOT NULL CHECK (trigger IN ('AUTO', 'MANUAL')),
   started_at    timestamptz NOT NULL DEFAULT now(),
   finished_at   timestamptz,
-  outcome       text,       -- ACCEPTED | ALREADY_KNOWN | REJECTED | TRANSIENT | UNPARSEABLE | SKIPPED_KNOWN
+  outcome       text,       -- ACCEPTED | ALREADY_KNOWN | REJECTED | TRANSIENT | UNCERTAIN | UNPARSEABLE | CONTRACT_ERROR | CHECKED_KNOWN
   http_status   int,
   error         text,
   raw_response  text
@@ -79,6 +83,14 @@ CREATE TABLE inbox (
   disposition   text NOT NULL CHECK (disposition IN ('APPLIED', 'STALE', 'UNKNOWN_OPERATION'))
 );
 CREATE INDEX inbox_operation_idx ON inbox (operation_key, received_at);
+
+-- Входящие сообщения, которые не удалось разобрать: сохраняются для оператора, а не теряются (D05).
+CREATE TABLE inbox_invalid (
+  id           bigserial PRIMARY KEY,
+  received_at  timestamptz NOT NULL DEFAULT now(),
+  raw          text NOT NULL,
+  error        text NOT NULL
+);
 
 -- Журнал: все значимые изменения задания, включая действия оператора (D06).
 CREATE TABLE task_events (

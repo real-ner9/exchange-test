@@ -136,8 +136,8 @@ public class OperationService {
     }
 
     public List<OperationView> updatedSince(Instant since, int limit) {
-        return jdbc.sql(SELECT_VIEW + " WHERE updated_at > :since ORDER BY updated_at, operation_key LIMIT :limit")
-                .param("since", since)
+        return jdbc.sql(SELECT_VIEW + " WHERE updated_at >= :since ORDER BY updated_at, operation_key LIMIT :limit")
+                .param("since", java.sql.Timestamp.from(since))
                 .param("limit", limit)
                 .query(OperationService::view)
                 .list();
