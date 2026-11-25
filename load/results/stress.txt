@@ -1,0 +1,11 @@
+requests: 90864, 1512.9 req/s, failed 0.00%
+http_req_duration{expected_response:true}: avg 12.8 med 10.3 p95 30.0 p99 53.6 max 220.7 ms
+http_req_duration{name:operator queue}: avg 22.3 med 11.4 p95 67.5 p99 84.8 max 144.5 ms
+http_req_duration{name:my tasks}: avg 13.4 med 11.3 p95 28.7 p99 42.5 max 79.9 ms
+http_req_duration: avg 12.8 med 10.3 p95 30.0 p99 53.6 max 220.7 ms
+http_req_duration{name:create task}: avg 17.6 med 16.2 p95 30.2 p99 42.0 max 80.5 ms
+threshold http_req_duration{name:operator queue} p(95)<500: OK
+threshold http_req_failed rate<0.01: OK
+threshold http_req_duration{name:my tasks} p(95)<300: OK
+threshold http_req_duration p(95)<500: OK
+threshold http_req_duration{name:create task} p(95)<300: OK

@@ -1,0 +1,4 @@
+time="2026-11-25T10:33:15Z" level=info msg="exchange drained in 89 s after seeding; tasks by status: {\"COMPLETED\":5000,\"FAILED\":0,\"REJECTED\":0,\"NEEDS_ATTENTION\":0,\"MANUALLY_CLOSED\":0,\"QUEUED\":0,\"RETRY_WAIT\":0,\"ACCEPTED\":0,\"SENDING\":0}; emulator: {\"duplicateExecutions\":0,\"executions\":5000,\"undeliveredResults\":0,\"pending\":0,\"operations\":5000,\"receivedAttempts\":5000}" source=console
+requests: 5111, failed: 0.00%
+create task ms: avg 32.7 p95 80.2 p99 135.2 max 262.2
+throughput: 52.3 req/s over 97.7 s

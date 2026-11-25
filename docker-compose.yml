@@ -53,6 +53,14 @@ services:
     depends_on:
       - app-api
 
+  # Нагрузочный прогон: docker compose --profile load run --rm k6 run /scripts/seed.js
+  k6:
+    image: grafana/k6:1.4.2
+    profiles: ["load"]
+    volumes: ["./load:/scripts"]
+    environment:
+      BASE_URL: http://app-web
+
 volumes:
   app-db:
   emulator-db:
