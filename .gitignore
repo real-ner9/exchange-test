@@ -7,3 +7,5 @@ coverage/
 agent-sessions.zip
 agent-sessions/exports/
 .playwright-mcp/
+research_notes/
+reports/

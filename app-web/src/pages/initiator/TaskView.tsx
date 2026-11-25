@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router'
+import { Alert, Button, DefinitionList, Text } from '@gravity-ui/uikit'
 import { api, type InitiatorTask } from '../../api'
-import { Badge, ErrorNote, fmtDate, fmtMoney, SkeletonCard, StatusStepper, usePolling } from '../../ui'
-import { LIVE_CODES } from './MyTasks'
+import { ErrorNote, fmtDate, fmtMoney, Loading, PageHead, StatusLabel, usePolling } from '../../ui'
 
 export default function TaskView() {
   const { id } = useParams()
@@ -9,77 +9,62 @@ export default function TaskView() {
   const { data: t, error } = usePolling(() => api.get<InitiatorTask>('/api/tasks/' + id), [id])
 
   if (error && !t) return <ErrorNote text={error} />
-  if (!t)
-    return (
-      <section className="narrow">
-        <SkeletonCard />
-      </section>
-    )
+  if (!t) return <Loading />
 
-  const tone = t.status.needsAction ? 'note-warn' : t.status.code === 'COMPLETED' ? 'note-success' : 'note-info'
+  const theme = t.status.needsAction ? 'warning' : t.status.code === 'COMPLETED' ? 'success' : 'info'
   return (
     <section className="narrow">
       <Link to="/tasks" className="back">
         ← Мои задания
       </Link>
-      <div className="card hero-card">
-        <div className="page-head">
-          <div>
-            <h2>{t.title}</h2>
-            <div className="muted small">создано {fmtDate(t.createdAt)}</div>
-          </div>
-          <Badge tone={t.status.color} live={LIVE_CODES.has(t.status.code)}>
-            <span key={t.status.code} className="pop">
-              {t.status.label}
-            </span>
-          </Badge>
-        </div>
+      <PageHead title={t.title} sub={'создано ' + fmtDate(t.createdAt)}>
+        <StatusLabel tone={t.status.color}>{t.status.label}</StatusLabel>
+      </PageHead>
 
-        <StatusStepper code={t.status.code} />
+      <Alert
+        className="block"
+        theme={theme}
+        view="outlined"
+        title={t.status.needsAction ? 'Требуется ваше действие' : undefined}
+        message={
+          <>
+            {t.status.hint}
+            {t.problem && <div>Причина: {t.problem}</div>}
+          </>
+        }
+        actions={
+          t.status.needsAction ? (
+            <Button
+              view="action"
+              onClick={() =>
+                navigate('/tasks/new', { state: { title: t.payload.title, amount: t.payload.amount, comment: t.payload.comment } })
+              }
+            >
+              Создать исправленное задание
+            </Button>
+          ) : undefined
+        }
+      />
 
-        <div className={'note ' + tone} key={t.status.code}>
-          {t.status.needsAction && <div className="strong">Требуется ваше действие</div>}
-          {t.status.hint}
-          {t.problem && <div className="problem">Причина: {t.problem}</div>}
-        </div>
-        {t.status.needsAction && (
-          <button
-            onClick={() =>
-              navigate('/tasks/new', {
-                state: { title: t.payload.title, amount: t.payload.amount, comment: t.payload.comment },
-              })
-            }
-          >
-            Создать исправленное задание
-          </button>
-        )}
+      <DefinitionList className="block" nameMaxWidth={160}>
+        <DefinitionList.Item name="Сумма">{fmtMoney(t.payload.amount)}</DefinitionList.Item>
+        <DefinitionList.Item name="Выполнено">{fmtDate(t.completedAt)}</DefinitionList.Item>
+        <DefinitionList.Item name="Комментарий">{t.payload.comment || '—'}</DefinitionList.Item>
+      </DefinitionList>
 
-        <div className="detail-grid">
-          <div className="detail">
-            <div className="detail-label">Сумма</div>
-            <div className="detail-value">{fmtMoney(t.payload.amount)}</div>
-          </div>
-          <div className="detail">
-            <div className="detail-label">Выполнено</div>
-            <div className="detail-value">{fmtDate(t.completedAt)}</div>
-          </div>
-          <div className="detail wide">
-            <div className="detail-label">Комментарий</div>
-            <div className="detail-value">{t.payload.comment || '—'}</div>
-          </div>
-        </div>
-
-        <h3>История</h3>
-        <ol className="timeline">
+      <Text as="h2" variant="subheader-2" className="section-title">
+        История
+      </Text>
+      <table className="plain-table history">
+        <tbody>
           {t.history?.map((h, i) => (
-            <li key={i} style={{ ['--i' as string]: i }}>
-              <span className={'dot dot-' + h.color} />
-              <span className="tl-label">{h.label}</span>
-              <span className="when">{fmtDate(h.at)}</span>
-            </li>
+            <tr key={i}>
+              <td className="cell-nowrap muted">{fmtDate(h.at)}</td>
+              <td>{h.label}</td>
+            </tr>
           ))}
-        </ol>
-      </div>
+        </tbody>
+      </table>
     </section>
   )
 }

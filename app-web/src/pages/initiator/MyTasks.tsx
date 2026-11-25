@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { Alert, Button, SegmentedRadioGroup } from '@gravity-ui/uikit'
 import { api, type InitiatorTask, type Page } from '../../api'
-import { AnimatedNumber, Badge, Empty, ErrorNote, fmtAgo, fmtMoney, Pager, rowProps, SkeletonRows, useChangedIds, usePolling } from '../../ui'
+import { DataTable, ErrorNote, fmtAgo, fmtMoney, Loading, PageHead, Pager, StatusLabel, useChangedIds, usePolling, type Column } from '../../ui'
 
 type ListResponse = Page<InitiatorTask> & { counts: Record<string, number> }
 
@@ -12,7 +13,22 @@ const FILTERS = [
   { key: 'completed', label: 'Выполнено' },
 ]
 
-export const LIVE_CODES = new Set(['SENDING', 'ACCEPTED'])
+const COLUMNS: Column<InitiatorTask>[] = [
+  {
+    id: 'title',
+    header: 'Задание',
+    cell: (t) => (
+      <>
+        {t.title}
+        {t.status.needsAction && <div className="warn-text">требуется ваше действие</div>}
+      </>
+    ),
+  },
+  { id: 'amount', header: 'Сумма', num: true, width: 140, cell: (t) => fmtMoney(t.payload.amount) },
+  { id: 'status', header: 'Статус', width: 220, cell: (t) => <StatusLabel tone={t.status.color}>{t.status.label}</StatusLabel> },
+  { id: 'created', header: 'Создано', width: 130, nowrap: true, cell: (t) => fmtAgo(t.createdAt) },
+  { id: 'updated', header: 'Изменено', width: 130, nowrap: true, cell: (t) => fmtAgo(t.updatedAt) },
+]
 
 export default function MyTasks() {
   const [filter, setFilter] = useState('all')
@@ -23,93 +39,55 @@ export default function MyTasks() {
     [filter, page],
   )
   const changed = useChangedIds(data?.items, (t) => t.id, (t) => t.status.code)
+  const pick = (f: string) => {
+    setFilter(f)
+    setPage(0)
+  }
 
   return (
     <section>
-      <div className="page-head">
-        <div>
-          <h2>Мои задания</h2>
-          <p className="subtitle">Статусы обновляются сами — страницу перезагружать не нужно.</p>
-        </div>
-        <Link to="/tasks/new" className="button">
-          <span className="plus">+</span> Новое задание
-        </Link>
-      </div>
-      {data && data.counts.needsAction > 0 && (
-        <div className="note note-warn attention-in">
-          <span className="note-icon">!</span>
-          <div>
-            Ваше действие нужно по <b>{data.counts.needsAction}</b> {plural(data.counts.needsAction)}.{' '}
-            <button className="link" onClick={() => { setFilter('needsAction'); setPage(0) }}>
-              Показать
-            </button>
-          </div>
-        </div>
+      <PageHead title="Мои задания" sub="Статусы обновляются автоматически.">
+        <Button view="action" onClick={() => navigate('/tasks/new')}>
+          Новое задание
+        </Button>
+      </PageHead>
+      {data && data.counts.needsAction > 0 && filter !== 'needsAction' && (
+        <Alert
+          className="block"
+          theme="warning"
+          view="outlined"
+          message={`Ваше действие нужно по заданиям: ${data.counts.needsAction}.`}
+          actions={[{ text: 'Показать', handler: () => pick('needsAction') }]}
+          layout="horizontal"
+        />
       )}
-      <div className="tabs">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            className={'tab' + (filter === f.key ? ' active' : '')}
-            onClick={() => { setFilter(f.key); setPage(0) }}
-          >
-            {f.label}
-            {data && (
-              <span className={'count' + (f.key === 'needsAction' && data.counts[f.key] > 0 ? ' count-warn' : '')}>
-                <AnimatedNumber value={data.counts[f.key] ?? 0} />
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="toolbar">
+        <SegmentedRadioGroup
+          value={filter}
+          onUpdate={pick}
+          options={FILTERS.map((f) => ({
+            value: f.key,
+            content: data ? `${f.label} · ${data.counts[f.key] ?? 0}` : f.label,
+          }))}
+        />
       </div>
       <ErrorNote text={error} />
-      {!data && !error && <SkeletonRows />}
-      {data && data.items.length === 0 && (
-        <Empty icon="📭">
-          Здесь пока пусто. <Link to="/tasks/new">Создайте первое задание</Link>
-        </Empty>
-      )}
-      {data && data.items.length > 0 && (
-        <div className="table-wrap" key={filter + page}>
-          <table className="table clickable">
-            <thead>
-              <tr>
-                <th>Задание</th>
-                <th>Сумма</th>
-                <th>Статус</th>
-                <th>Создано</th>
-                <th>Изменено</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((t, i) => (
-                <tr key={t.id} onClick={() => navigate('/tasks/' + t.id)} {...rowProps(i, changed.has(t.id))}>
-                  <td>
-                    <div className="strong">{t.title}</div>
-                    {t.status.needsAction && <div className="small warn-text">Требуется ваше действие</div>}
-                  </td>
-                  <td className="num">{fmtMoney(t.payload.amount)}</td>
-                  <td>
-                    <Badge tone={t.status.color} live={LIVE_CODES.has(t.status.code)}>
-                      {t.status.label}
-                    </Badge>
-                  </td>
-                  <td className="muted">{fmtAgo(t.createdAt)}</td>
-                  <td className="muted">{fmtAgo(t.updatedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!data && !error && <Loading />}
+      {data && (
+        <DataTable
+          rows={data.items}
+          columns={COLUMNS}
+          rowKey={(t) => t.id}
+          changed={changed}
+          onRowClick={(t) => navigate('/tasks/' + t.id)}
+          empty={
+            <>
+              Заданий нет. <Link to="/tasks/new">Создать задание</Link>
+            </>
+          }
+        />
       )}
       {data && <Pager page={page} size={data.size} total={data.total} onPage={setPage} />}
     </section>
   )
-}
-
-function plural(n: number) {
-  const m10 = n % 10
-  const m100 = n % 100
-  if (m10 === 1 && m100 !== 11) return 'заданию'
-  return 'заданиям'
 }

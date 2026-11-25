@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { Logo } from '../App'
+import { Button, Text, TextInput } from '@gravity-ui/uikit'
 import { useAuth } from '../auth'
-import { ErrorNote } from '../ui'
+import { ErrorNote, Field } from '../ui'
 
 const DEMO = [
-  { login: 'ivanov', name: 'Иванов И.', role: 'Инициатор', tone: 'in' },
-  { login: 'petrova', name: 'Петрова А.', role: 'Инициатор', tone: 'in' },
-  { login: 'operator', name: 'Сидоров С.', role: 'Оператор', tone: 'op' },
-  { login: 'operator2', name: 'Кузнецова Е.', role: 'Оператор', tone: 'op' },
+  { login: 'ivanov', name: 'Иванов И.', role: 'инициатор' },
+  { login: 'petrova', name: 'Петрова А.', role: 'инициатор' },
+  { login: 'operator', name: 'Сидоров С.', role: 'оператор' },
+  { login: 'operator2', name: 'Кузнецова Е.', role: 'оператор' },
 ]
 
 export default function Login() {
@@ -39,54 +39,39 @@ export default function Login() {
 
   return (
     <div className="login">
-      <div className="login-glow g1" />
-      <div className="login-glow g2" />
-      <div className="login-side">
-        <Logo size={52} />
-        <h1>Обмен заданиями</h1>
-        <p>Внутренняя система ↔ внешний сервис исполнения. Каждое задание — ровно одно исполнение, даже при сбоях связи.</p>
-        <ul className="login-points">
-          <li>Статус задания понятен без технических деталей</li>
-          <li>Повторы, потерянные ответы и дубли — под контролем</li>
-          <li>Сверка двух систем и журнал действий оператора</li>
-        </ul>
-      </div>
-      <form className="card login-card" onSubmit={onSubmit}>
-        <h2>Вход</h2>
-        <label>
-          Логин
-          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus autoComplete="username" />
-        </label>
-        <label>
-          Пароль
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-        </label>
+      <form className="login-form" onSubmit={onSubmit}>
+        <Text as="h1" variant="header-1">
+          Обмен заданиями — вход
+        </Text>
+        <Field id="login" label="Логин">
+          <TextInput id="login" value={name} onUpdate={setName} autoFocus autoComplete="username" size="l" />
+        </Field>
+        <Field id="password" label="Пароль">
+          <TextInput id="password" type="password" value={password} onUpdate={setPassword} autoComplete="current-password" size="l" />
+        </Field>
         <ErrorNote text={error} />
-        <button type="submit" className="wide" disabled={!!busy || !name || !password}>
-          {busy === name ? <span className="spinner" /> : null}
+        <Button type="submit" view="action" size="l" width="max" loading={busy === name && !!name} disabled={!name || !password}>
           Войти
-        </button>
-        <div className="divider">
-          <span>или демо-пользователь · пароль demo</span>
-        </div>
-        <div className="demo-users">
-          {DEMO.map((d, i) => (
-            <button
-              type="button"
-              key={d.login}
-              className="demo-user"
-              style={{ ['--i' as string]: i }}
-              disabled={!!busy}
-              onClick={() => submit(d.login, 'demo')}
-            >
-              <span className={'avatar avatar-' + d.tone}>{d.name[0]}</span>
-              <span className="demo-text">
-                <span className="strong">{d.name}</span>
-                <span className="small muted">{d.role}</span>
-              </span>
-              {busy === d.login ? <span className="spinner dark" /> : <span className="arrow">→</span>}
-            </button>
-          ))}
+        </Button>
+
+        <div className="login-demo">
+          <Text color="secondary">Демо-пользователи, пароль demo:</Text>
+          <table className="plain-table">
+            <tbody>
+              {DEMO.map((d) => (
+                <tr key={d.login}>
+                  <td className="mono">{d.login}</td>
+                  <td>{d.name}</td>
+                  <td className="muted">{d.role}</td>
+                  <td>
+                    <Button size="s" view="outlined" loading={busy === d.login} disabled={!!busy} onClick={() => submit(d.login, 'demo')}>
+                      Войти
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </form>
     </div>

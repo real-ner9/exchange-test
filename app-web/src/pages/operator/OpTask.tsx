@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { Alert, Button, DefinitionList, Dialog, SegmentedRadioGroup, Text, TextArea } from '@gravity-ui/uikit'
 import { api, ApiError, type OperatorTaskDetail, type TaskEvent } from '../../api'
 import {
   ATTEMPT_LABELS,
@@ -12,12 +13,37 @@ import {
   STATUS_TONE,
   label,
 } from '../../labels'
-import { Badge, ErrorNote, fmtDate, fmtMoney, Modal, rowProps, SkeletonCard, useToast, usePolling } from '../../ui'
-
-const LIVE = new Set(['QUEUED', 'SENDING', 'RETRY_WAIT', 'ACCEPTED'])
-
+import { DataTable, ErrorNote, fmtDate, fmtMoney, Loading, PageHead, StatusLabel, useToast, usePolling, type Column } from '../../ui'
 
 type Executions = { operationKey: string; status: string | null; executions: number; receivedAttempts: number }
+type Attempt = OperatorTaskDetail['attempts'][number]
+type Result = OperatorTaskDetail['results'][number]
+
+const ATTEMPT_COLUMNS: Column<Attempt>[] = [
+  { id: 'at', header: 'Начата', width: 150, nowrap: true, cell: (a) => fmtDate(a.startedAt) },
+  { id: 'trigger', header: 'Запуск', width: 90, cell: (a) => (a.trigger === 'MANUAL' ? 'вручную' : 'авто') },
+  { id: 'outcome', header: 'Исход', width: 260, cell: (a) => (a.outcome ? label(ATTEMPT_LABELS, a.outcome) : 'в процессе') },
+  { id: 'http', header: 'HTTP', num: true, width: 70, cell: (a) => a.httpStatus ?? '—' },
+  {
+    id: 'error',
+    header: 'Ошибка / ответ',
+    cell: (a) => (
+      <>
+        {a.error}
+        {a.rawResponse && <pre className="raw">{a.rawResponse}</pre>}
+      </>
+    ),
+  },
+  { id: 'id', header: 'ID попытки', width: 100, cell: (a) => <span className="mono">{a.attemptId.slice(0, 8)}</span> },
+]
+
+const RESULT_COLUMNS: Column<Result>[] = [
+  { id: 'at', header: 'Получен', width: 150, nowrap: true, cell: (r) => fmtDate(r.receivedAt) },
+  { id: 'version', header: 'Версия', num: true, width: 80, cell: (r) => r.version },
+  { id: 'outcome', header: 'Исход', width: 140, cell: (r) => r.outcome },
+  { id: 'disposition', header: 'Обработка', cell: (r) => label(DISPOSITION_LABELS, r.disposition) },
+  { id: 'id', header: 'ID результата', width: 120, cell: (r) => <span className="mono">{r.resultId.slice(0, 8)}</span> },
+]
 
 export default function OpTask() {
   const { id } = useParams()
@@ -31,7 +57,13 @@ export default function OpTask() {
   const toast = useToast()
 
   if (error && !t) return <ErrorNote text={error} />
-  if (!t) return <SkeletonCard />
+  if (!t) return <Loading />
+
+  function open(kind: 'close' | 'retry') {
+    setDialog(kind)
+    setReason('')
+    setActionError(null)
+  }
 
   async function act(kind: 'close' | 'retry') {
     if (!t) return
@@ -39,14 +71,11 @@ export default function OpTask() {
     setActionError(null)
     try {
       await api.post(`/api/operator/tasks/${t.id}/${kind}`, { version: t.version, reason })
-      toast(kind === 'close' ? 'Задание закрыто без подтверждения — записано в журнал' : 'Повтор поставлен в очередь — отправка начнётся сразу')
+      toast(kind === 'close' ? 'Задание закрыто без подтверждения, запись в журнале' : 'Повтор поставлен в очередь')
       setDialog(null)
-      setReason('')
       await reload()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setActionError(msg)
-      toast(msg, 'error')
+      setActionError(e instanceof Error ? e.message : String(e))
       if (e instanceof ApiError && e.status === 409) await reload()
     } finally {
       setBusy(false)
@@ -67,235 +96,175 @@ export default function OpTask() {
       <Link to="/op/queue" className="back">
         ← Очередь
       </Link>
-      <div className="card">
-        <div className="page-head">
-          <div>
-            <h2>{t.title}</h2>
-            <div className="muted small">
-              {t.initiator} · создано {fmtDate(t.createdAt)} · инициатор видит: «{t.userStatus}»
-            </div>
-          </div>
-          <Badge tone={STATUS_TONE[t.status]} live={LIVE.has(t.status)}>
-            <span key={t.status} className="pop">{label(STATUS_LABELS, t.status)}</span>
-          </Badge>
-        </div>
+      <PageHead
+        title={t.title}
+        sub={`${t.initiator} · создано ${fmtDate(t.createdAt)} · инициатор видит: «${t.userStatus}»`}
+      >
+        <StatusLabel tone={STATUS_TONE[t.status]}>{label(STATUS_LABELS, t.status)}</StatusLabel>
+      </PageHead>
 
-        {t.attentionReason && <div className="note note-warn">{label(ATTENTION_LABELS, t.attentionReason)}</div>}
-        {t.status === 'MANUALLY_CLOSED' && (
-          <div className="note note-purple">
-            Закрыто без подтверждения внешней системы. Причина: «{t.closedReason}». В отчёт о выполнении не входит;
-            сверка покажет фактическое состояние.
-          </div>
-        )}
-        {t.confirmedAfterManualClose && (
-          <div className="note note-info">Исполнение подтверждено внешней системой после ручного закрытия.</div>
-        )}
+      {t.attentionReason && (
+        <Alert className="block" theme="warning" view="outlined" message={label(ATTENTION_LABELS, t.attentionReason)} />
+      )}
+      {t.status === 'MANUALLY_CLOSED' && (
+        <Alert
+          className="block"
+          theme="utility"
+          view="outlined"
+          message={`Закрыто без подтверждения внешней системы. Причина: «${t.closedReason}». В отчёт о выполнении не входит; сверка покажет фактическое состояние.`}
+        />
+      )}
+      {t.confirmedAfterManualClose && (
+        <Alert className="block" theme="info" view="outlined" message="Исполнение подтверждено внешней системой после ручного закрытия." />
+      )}
 
-        <div className="actions">
-          <button disabled={!t.canRetry} onClick={() => { setDialog('retry'); setActionError(null) }}
-            title="Отправить сейчас, не дожидаясь паузы между повторами. Ключ операции тот же — двойного исполнения не будет.">
-            Повторить сейчас
-          </button>
-          <button className="danger" disabled={!t.canClose} onClick={() => { setDialog('close'); setActionError(null) }}
-            title="Бывшее «Считать выполненным». Останавливает повторы, но не отмечает задание выполненным.">
-            Закрыть без подтверждения
-          </button>
-          <button className="secondary" onClick={checkExecutions} title="Спросить у эмулятора, сколько раз операция фактически исполнялась">
-            Сколько раз исполнено?
-          </button>
-          {exec && (
-            <span className={'exec-chip ' + (exec.executions > 1 ? 'exec-bad' : 'exec-ok')} key={exec.receivedAttempts + '-' + exec.executions}>
-              Эмулятор: исполнений {exec.executions}, получено отправок {exec.receivedAttempts}, статус {exec.status ?? 'нет операции'}
-            </span>
+      <div className="actions block">
+        <Button view="action" disabled={!t.canRetry} onClick={() => open('retry')}>
+          Повторить сейчас
+        </Button>
+        <Button view="outlined-danger" disabled={!t.canClose} onClick={() => open('close')}>
+          Закрыть без подтверждения
+        </Button>
+        <Button view="outlined" onClick={checkExecutions}>
+          Сколько раз исполнено?
+        </Button>
+        {exec && (
+          <Text color={exec.executions > 1 ? 'danger' : 'secondary'}>
+            Эмулятор: исполнений {exec.executions}, получено отправок {exec.receivedAttempts}, статус{' '}
+            {exec.status ?? 'нет операции'}
+          </Text>
+        )}
+      </div>
+      <ErrorNote text={dialog ? null : actionError} />
+
+      <DefinitionList className="block" nameMaxWidth={200}>
+        <DefinitionList.Item name="Ключ операции" copyText={t.operationKey}>
+          <span className="mono">{t.operationKey}</span>
+        </DefinitionList.Item>
+        <DefinitionList.Item name="Сумма">{fmtMoney(t.payload.amount)}</DefinitionList.Item>
+        <DefinitionList.Item name="У внешней системы">
+          {t.externalStatus ? `${t.externalStatus} (версия ${t.externalVersion})` : 'нет сведений'}
+        </DefinitionList.Item>
+        <DefinitionList.Item name="Попыток доставки">
+          {t.attemptsCount}
+          {t.firstAttemptAt && `, первая ${fmtDate(t.firstAttemptAt)}`}
+        </DefinitionList.Item>
+        <DefinitionList.Item name="Следующая попытка">{t.status === 'RETRY_WAIT' ? fmtDate(t.nextAttemptAt) : '—'}</DefinitionList.Item>
+        <DefinitionList.Item name="Последняя ошибка">{t.lastError ?? '—'}</DefinitionList.Item>
+        <DefinitionList.Item name="Ключ формы">
+          <span className="mono">{t.clientRequestId}</span>
+        </DefinitionList.Item>
+        <DefinitionList.Item name="Версия записи">{t.version}</DefinitionList.Item>
+      </DefinitionList>
+
+      {t.discrepancies.length > 0 && (
+        <>
+          <Text as="h2" variant="subheader-2" className="section-title">
+            Сверка
+          </Text>
+          <ul className="plain-list block">
+            {t.discrepancies.map((d) => (
+              <li key={d.id}>
+                <StatusLabel tone={d.resolvedAt ? 'gray' : 'yellow'}>{d.resolvedAt ? 'разобрано' : 'открыто'}</StatusLabel>{' '}
+                {label(DISCREPANCY_LABELS, d.kind)} {d.resolution && <span className="muted">— {d.resolution}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <div className="toolbar">
+        <SegmentedRadioGroup
+          value={tab}
+          onUpdate={(v) => setTab(v as typeof tab)}
+          options={[
+            { value: 'events', content: `Журнал · ${t.events.length}` },
+            { value: 'attempts', content: `Попытки доставки · ${t.attempts.length}` },
+            { value: 'results', content: `Входящие результаты · ${t.results.length}` },
+          ]}
+        />
+      </div>
+      {tab === 'events' && <EventsTable events={t.events} />}
+      {tab === 'attempts' && <DataTable rows={t.attempts} columns={ATTEMPT_COLUMNS} rowKey={(a) => a.attemptId} empty="Попыток не было" />}
+      {tab === 'results' && <DataTable rows={t.results} columns={RESULT_COLUMNS} rowKey={(r) => r.resultId} empty="Результатов не было" />}
+
+      <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)} maxWidth="m">
+        <Dialog.Header caption={dialog === 'close' ? 'Закрыть без подтверждения' : 'Повторить отправку сейчас'} />
+        <Dialog.Body>
+          {dialog === 'close' ? (
+            <p>
+              Задание уйдёт из рабочей очереди и повторы остановятся, но оно <b>не будет</b> отмечено выполненным и не
+              попадёт в отчёт: подтверждения исполнения нет. Если внешняя система позже сообщит об исполнении, статус
+              обновится автоматически; если нет — сверка покажет расхождение.
+            </p>
+          ) : (
+            <p>
+              Попытка уйдёт сразу, без паузы между повторами. Ключ операции тот же, поэтому внешняя система не исполнит её
+              второй раз. Если исход прошлой попытки неизвестен, сначала будет запрошен статус.
+            </p>
           )}
-        </div>
-        <ErrorNote text={dialog ? null : actionError} />
-
-        <dl className="fields two">
-          <dt>Ключ операции</dt>
-          <dd className="mono">{t.operationKey}</dd>
-          <dt>Сумма</dt>
-          <dd>{fmtMoney(t.payload.amount)}</dd>
-          <dt>У внешней системы</dt>
-          <dd>{t.externalStatus ? `${t.externalStatus} (версия ${t.externalVersion})` : 'нет сведений'}</dd>
-          <dt>Попыток доставки</dt>
-          <dd>{t.attemptsCount}{t.firstAttemptAt && `, первая ${fmtDate(t.firstAttemptAt)}`}</dd>
-          <dt>Следующая попытка</dt>
-          <dd>{t.status === 'RETRY_WAIT' ? fmtDate(t.nextAttemptAt) : '—'}</dd>
-          <dt>Последняя ошибка</dt>
-          <dd>{t.lastError ?? '—'}</dd>
-          <dt>Ключ формы</dt>
-          <dd className="mono small">{t.clientRequestId}</dd>
-          <dt>Версия записи</dt>
-          <dd>{t.version}</dd>
-        </dl>
-
-        {t.discrepancies.length > 0 && (
-          <>
-            <h3>Сверка</h3>
-            <ul className="plain">
-              {t.discrepancies.map((d) => (
-                <li key={d.id}>
-                  <Badge tone={d.resolvedAt ? 'gray' : 'yellow'}>{d.resolvedAt ? 'разобрано' : 'открыто'}</Badge>{' '}
-                  {label(DISCREPANCY_LABELS, d.kind)} {d.resolution && <span className="muted">— {d.resolution}</span>}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-
-        <div className="tabs">
-          <button className={'tab' + (tab === 'events' ? ' active' : '')} onClick={() => setTab('events')}>
-            Журнал <span className="count">{t.events.length}</span>
-          </button>
-          <button className={'tab' + (tab === 'attempts' ? ' active' : '')} onClick={() => setTab('attempts')}>
-            Попытки доставки <span className="count">{t.attempts.length}</span>
-          </button>
-          <button className={'tab' + (tab === 'results' ? ' active' : '')} onClick={() => setTab('results')}>
-            Входящие результаты <span className="count">{t.results.length}</span>
-          </button>
-        </div>
-
-        <div className="tab-body" key={tab}>
-        {tab === 'events' && <EventsTable events={t.events} />}
-        {tab === 'attempts' && (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Начата</th>
-                <th>Запуск</th>
-                <th>Исход</th>
-                <th>HTTP</th>
-                <th>Ошибка / ответ</th>
-                <th>ID попытки</th>
-              </tr>
-            </thead>
-            <tbody>
-              {t.attempts.map((a, i) => (
-                <tr key={a.attemptId} {...rowProps(i, false)}>
-                  <td>{fmtDate(a.startedAt)}</td>
-                  <td>{a.trigger === 'MANUAL' ? 'вручную' : 'авто'}</td>
-                  <td>{a.outcome ? label(ATTEMPT_LABELS, a.outcome) : 'в процессе…'}</td>
-                  <td>{a.httpStatus ?? '—'}</td>
-                  <td className="small">
-                    {a.error}
-                    {a.rawResponse && <pre className="raw">{a.rawResponse}</pre>}
-                  </td>
-                  <td className="mono small">{a.attemptId.slice(0, 8)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {tab === 'results' && (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Получен</th>
-                <th>Версия</th>
-                <th>Исход</th>
-                <th>Обработка</th>
-                <th>ID результата</th>
-              </tr>
-            </thead>
-            <tbody>
-              {t.results.map((r, i) => (
-                <tr key={r.resultId} {...rowProps(i, false)}>
-                  <td>{fmtDate(r.receivedAt)}</td>
-                  <td>{r.version}</td>
-                  <td>{r.outcome}</td>
-                  <td>{label(DISPOSITION_LABELS, r.disposition)}</td>
-                  <td className="mono small">{r.resultId.slice(0, 8)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-      </div>
-
-      {dialog === 'close' && (
-        <Modal title="Закрыть без подтверждения" onClose={() => setDialog(null)}>
-          <p>
-            Это бывшая кнопка «Считать выполненным». Задание уйдёт из рабочей очереди и повторы остановятся, но оно{' '}
-            <b>не будет</b> отмечено выполненным и не попадёт в отчёт: подтверждения исполнения нет. Если внешняя система
-            позже сообщит об исполнении, статус обновится автоматически; если нет — сверка покажет расхождение.
-          </p>
-          <label>
-            Причина (обязательно, видна в журнале)
-            <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
-          </label>
+          <Text as="label" htmlFor="reason" color="secondary" className="field-label">
+            {dialog === 'close' ? 'Причина (обязательно, попадёт в журнал)' : 'Комментарий (необязательно)'}
+          </Text>
+          <TextArea id="reason" value={reason} onUpdate={setReason} minRows={3} autoFocus />
           <ErrorNote text={actionError} />
-          <div className="actions">
-            <button className="danger" disabled={busy || reason.trim().length < 5} onClick={() => act('close')}>
-              Закрыть
-            </button>
-            <button className="secondary" onClick={() => setDialog(null)}>
-              Отмена
-            </button>
-          </div>
-        </Modal>
-      )}
-      {dialog === 'retry' && (
-        <Modal title="Повторить отправку сейчас" onClose={() => setDialog(null)}>
-          <p>
-            Новая попытка уйдёт сразу, без паузы между повторами. Ключ операции тот же, поэтому внешняя система не исполнит
-            её второй раз. Если исход прошлой попытки неизвестен, сначала будет запрошен статус.
-          </p>
-          <label>
-            Комментарий (необязательно)
-            <input value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
-          </label>
-          <ErrorNote text={actionError} />
-          <div className="actions">
-            <button disabled={busy} onClick={() => act('retry')}>
-              Повторить
-            </button>
-            <button className="secondary" onClick={() => setDialog(null)}>
-              Отмена
-            </button>
-          </div>
-        </Modal>
-      )}
+        </Dialog.Body>
+        <Dialog.Footer
+          textButtonApply={dialog === 'close' ? 'Закрыть задание' : 'Повторить'}
+          textButtonCancel="Отмена"
+          loading={busy}
+          propsButtonApply={{
+            view: dialog === 'close' ? 'outlined-danger' : 'action',
+            disabled: dialog === 'close' && reason.trim().length < 5,
+          }}
+          onClickButtonApply={() => dialog && act(dialog)}
+          onClickButtonCancel={() => setDialog(null)}
+        />
+      </Dialog>
     </section>
   )
 }
 
+const EVENT_COLUMNS: Column<TaskEvent>[] = [
+  { id: 'at', header: 'Когда', width: 150, nowrap: true, cell: (e) => fmtDate(e.at) },
+  { id: 'kind', header: 'Событие', width: 230, cell: (e) => label(EVENT_LABELS, e.kind) },
+  {
+    id: 'status',
+    header: 'Статус',
+    width: 260,
+    cell: (e) =>
+      e.fromStatus || e.toStatus ? `${label(STATUS_LABELS, e.fromStatus)} → ${label(STATUS_LABELS, e.toStatus)}` : '—',
+  },
+  { id: 'actor', header: 'Кто', width: 120, cell: (e) => e.actor },
+  {
+    id: 'details',
+    header: 'Причина / детали',
+    cell: (e) => (
+      <>
+        {e.reason && <div>«{e.reason}»</div>}
+        <Details d={e.details} />
+      </>
+    ),
+  },
+]
+
+const TASK_COLUMN: Column<TaskEvent> = {
+  id: 'task',
+  header: 'Задание',
+  width: 220,
+  cell: (e) => <Link to={'/op/tasks/' + e.taskId}>{e.taskTitle}</Link>,
+}
+
+const EVENT_COLUMNS_WITH_TASK = [EVENT_COLUMNS[0], TASK_COLUMN, ...EVENT_COLUMNS.slice(1)]
+
 export function EventsTable({ events, showTask }: { events: TaskEvent[]; showTask?: boolean }) {
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th>Когда</th>
-          {showTask && <th>Задание</th>}
-          <th>Событие</th>
-          <th>Статус</th>
-          <th>Кто</th>
-          <th>Причина / детали</th>
-        </tr>
-      </thead>
-      <tbody>
-        {events.map((e, i) => (
-          <tr key={e.id} {...rowProps(i, false)}>
-            <td className="nowrap">{fmtDate(e.at)}</td>
-            {showTask && (
-              <td>
-                <Link to={'/op/tasks/' + e.taskId}>{e.taskTitle}</Link>
-              </td>
-            )}
-            <td>{label(EVENT_LABELS, e.kind)}</td>
-            <td className="small nowrap">
-              {e.fromStatus || e.toStatus ? `${label(STATUS_LABELS, e.fromStatus)} → ${label(STATUS_LABELS, e.toStatus)}` : '—'}
-            </td>
-            <td>{e.actor}</td>
-            <td className="small">
-              {e.reason && <div>«{e.reason}»</div>}
-              <Details d={e.details} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <DataTable
+      rows={events}
+      columns={showTask ? EVENT_COLUMNS_WITH_TASK : EVENT_COLUMNS}
+      rowKey={(e) => String(e.id)}
+      empty="Событий нет"
+    />
   )
 }
 
@@ -310,5 +279,6 @@ function Details({ d }: { d: Record<string, unknown> | null }) {
   if (d.attempts !== undefined) parts.push(`попыток: ${d.attempts}`)
   if (d.kind) parts.push(label(DISCREPANCY_LABELS, String(d.kind)))
   if (d.reason && typeof d.reason === 'string') parts.push(d.reason)
+  if (parts.length === 0) return null
   return <div className="muted">{parts.join(' · ')}</div>
 }

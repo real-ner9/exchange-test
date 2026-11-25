@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { Alert, Button, Text, TextArea, TextInput } from '@gravity-ui/uikit'
 import { api, ApiError, type InitiatorTask } from '../../api'
-import { ErrorNote, fmtAgo } from '../../ui'
+import { ErrorNote, Field, fmtAgo, PageHead } from '../../ui'
 
 type Prefill = { title?: string; amount?: number | null; comment?: string | null }
 
@@ -52,57 +53,54 @@ export default function NewTask() {
 
   return (
     <section className="narrow">
-      <div className="page-head">
-        <div>
-          <h2>Новое задание</h2>
-          <p className="subtitle">Повторное нажатие «Создать» не создаст дубль — защита на сервере.</p>
-        </div>
-      </div>
-      <form className="card form" onSubmit={submit}>
-        <label>
-          Что нужно сделать *
-          <input value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} onBlur={checkSimilar} required />
-        </label>
-        <label>
-          Сумма, ₽
-          <input value={amount} inputMode="decimal" placeholder="необязательно" onChange={(e) => setAmount(e.target.value)} />
-        </label>
-        <label>
-          Комментарий
-          <textarea value={comment} maxLength={1000} rows={3} onChange={(e) => setComment(e.target.value)} />
-        </label>
+      <PageHead title="Новое задание" />
+      <form className="form" onSubmit={submit}>
+        <Field id="title" label="Что сделать">
+          <TextInput id="title" value={title} onUpdate={setTitle} onBlur={checkSimilar} controlProps={{ maxLength: 200, required: true }} />
+        </Field>
+        <Field id="amount" label="Сумма, ₽ (необязательно)">
+          <TextInput id="amount" value={amount} onUpdate={setAmount} controlProps={{ inputMode: 'decimal' }} />
+        </Field>
+        <Field id="comment" label="Комментарий">
+          <TextArea id="comment" value={comment} onUpdate={setComment} minRows={3} controlProps={{ maxLength: 1000 }} />
+        </Field>
 
         {similar.length > 0 && (
-          <div className="note note-warn attention-in">
-            <div className="strong">Похожее задание уже создано недавно:</div>
-            <ul>
-              {similar.map((s) => (
-                <li key={s.id}>
-                  <Link to={'/tasks/' + s.id} target="_blank">
-                    {s.title}
-                  </Link>{' '}
-                  — {fmtAgo(s.createdAt)}, {s.status.label.toLowerCase()}
-                </li>
-              ))}
-            </ul>
-            Если это другое поручение — создавайте. Если то же самое — новое задание не нужно.
-          </div>
+          <Alert
+            theme="warning"
+            view="outlined"
+            title="Похожее задание уже создано недавно"
+            message={
+              <>
+                <ul className="plain-list">
+                  {similar.map((s) => (
+                    <li key={s.id}>
+                      <Link to={'/tasks/' + s.id} target="_blank">
+                        {s.title}
+                      </Link>{' '}
+                      — {fmtAgo(s.createdAt)}, {s.status.label.toLowerCase()}
+                    </li>
+                  ))}
+                </ul>
+                Если это другое поручение — создавайте. Если то же самое — новое задание не нужно.
+              </>
+            }
+          />
         )}
 
         <ErrorNote text={error} />
         <div className="actions">
-          <button type="submit" disabled={busy || !title.trim()}>
-            {busy && <span className="spinner" />}
-            {busy ? 'Создаём…' : 'Создать'}
-          </button>
-          <Link to="/tasks" className="button secondary">
+          <Button type="submit" view="action" loading={busy} disabled={!title.trim()}>
+            Создать
+          </Button>
+          <Button view="outlined" onClick={() => navigate('/tasks')}>
             Отмена
-          </Link>
+          </Button>
         </div>
-        <div className="hint-box">
-          Подсказка для демо: «#reject» в названии — внешняя система отвергнет содержание, «#fail» — исполнит с отказом
-          (если оператор включил эти режимы).
-        </div>
+        <Text color="secondary">
+          Для демо: «#reject» в названии — внешняя система отвергнет содержание, «#fail» — исполнит с отказом (если
+          оператор включил эти режимы).
+        </Text>
       </form>
     </section>
   )

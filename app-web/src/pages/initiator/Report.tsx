@@ -1,13 +1,21 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { TextInput } from '@gravity-ui/uikit'
 import { api, type InitiatorTask } from '../../api'
-import { AnimatedNumber, Empty, ErrorNote, fmtDate, fmtMoney, rowProps, SkeletonRows, usePolling } from '../../ui'
+import { Counters, DataTable, Field, ErrorNote, fmtDate, fmtMoney, Loading, PageHead, usePolling, type Column } from '../../ui'
 
 type ReportResponse = { from: string; to: string; count: number; items: InitiatorTask[] }
 
 function isoDay(d: Date) {
   return d.toISOString().slice(0, 10)
 }
+
+const COLUMNS: Column<InitiatorTask>[] = [
+  { id: 'title', header: 'Задание', cell: (t) => <Link to={'/tasks/' + t.id}>{t.title}</Link> },
+  { id: 'amount', header: 'Сумма', num: true, width: 150, cell: (t) => fmtMoney(t.payload.amount) },
+  { id: 'created', header: 'Создано', width: 160, nowrap: true, cell: (t) => fmtDate(t.createdAt) },
+  { id: 'completed', header: 'Выполнено', width: 160, nowrap: true, cell: (t) => fmtDate(t.completedAt) },
+]
 
 export default function Report() {
   const [from, setFrom] = useState(isoDay(new Date(Date.now() - 30 * 86400000)))
@@ -24,62 +32,29 @@ export default function Report() {
 
   return (
     <section>
-      <div className="page-head">
-        <h2>Отчёт о выполнении</h2>
-      </div>
-      <div className="note note-info">
-        В отчёт попадают только задания, по которым внешняя система сообщила о фактическом исполнении. Принятые в работу,
-        закрытые оператором без подтверждения и отклонённые сюда не входят.
-      </div>
-      <div className="filters">
-        <label>
-          С <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label>
-          По <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </label>
+      <PageHead
+        title="Отчёт о выполнении"
+        sub="Только задания, исполнение которых подтвердила внешняя система. Принятые в работу, закрытые оператором без подтверждения и отклонённые не входят."
+      />
+      <div className="toolbar">
+        <Field id="from" label="С">
+          <TextInput id="from" value={from} onUpdate={setFrom} controlProps={{ type: 'date' }} />
+        </Field>
+        <Field id="to" label="По">
+          <TextInput id="to" value={to} onUpdate={setTo} controlProps={{ type: 'date' }} />
+        </Field>
       </div>
       {data && (
-        <div className="stats">
-          <div className="stat stat-green">
-            <div className="stat-value"><AnimatedNumber value={data.count} /></div>
-            <div className="stat-title">Выполнено заданий</div>
-          </div>
-          <div className="stat stat-blue">
-            <div className="stat-value small-value">{fmtMoney(total)}</div>
-            <div className="stat-title">На сумму</div>
-          </div>
-        </div>
+        <Counters
+          items={[
+            { label: 'Выполнено заданий', value: data.count.toLocaleString('ru-RU') },
+            { label: 'На сумму', value: fmtMoney(total) },
+          ]}
+        />
       )}
       <ErrorNote text={error} />
-      {!data && !error && <SkeletonRows />}
-      {data && data.items.length === 0 && <Empty icon="📊">За период нет выполненных заданий.</Empty>}
-      {data && data.items.length > 0 && (
-        <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Задание</th>
-              <th>Сумма</th>
-              <th>Создано</th>
-              <th>Выполнено</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((t, i) => (
-              <tr key={t.id} {...rowProps(i, false)}>
-                <td>
-                  <Link to={'/tasks/' + t.id}>{t.title}</Link>
-                </td>
-                <td className="num">{fmtMoney(t.payload.amount)}</td>
-                <td>{fmtDate(t.createdAt)}</td>
-                <td>{fmtDate(t.completedAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      )}
+      {!data && !error && <Loading />}
+      {data && <DataTable rows={data.items} columns={COLUMNS} rowKey={(t) => t.id} empty="За период нет выполненных заданий." />}
     </section>
   )
 }
