@@ -14,9 +14,18 @@
       "model": "claude-opus-5-5",
       "start": "2026-11-25T14:27:43+07:00",
       "end": null,
-      "task": "Review task, set up repo, DB schema and emulator contract",
+      "task": "Review task, choose stack (Spring per customer), DB schema, emulator contract, emulator with fault modes",
       "outcome": "in_progress",
-      "commits": ["5bcd550de6ea140f0494323ea8b4ae4d27b45eaa"]
+      "commits": [
+        "5bcd550",
+        "4b8fee9",
+        "7864950",
+        "c365153"
+      ],
+      "humanInterventions": [
+        "Stack switched from NestJS default to Java/Spring by user decision",
+        "User approved keeping fail_execution emulator mode"
+      ]
     }
   ]
 }
