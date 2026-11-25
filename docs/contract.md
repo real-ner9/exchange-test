@@ -26,7 +26,7 @@ FAILED,2,"исполнение завершилось отказом (outcome=FA
 ## Эндпоинты
 
 ```
-endpoints[7]{method,path,purpose}
+endpoints[8]{method,path,purpose}
 POST,/operations,"отправка операции"
 GET,/operations/{operationKey},"статус одной операции (проверка после потерянного ответа)"
 GET,/operations?updatedSince=&limit=,"список для сверки, по возрастанию updatedAt"
@@ -34,6 +34,7 @@ POST,{callbackUrl}/results,"эмулятор → app-api: сообщение о 
 GET,/admin/faults,"текущие режимы сбоев"
 POST,/admin/faults,"включить/выключить режимы сбоев"
 GET,/admin/operations/{operationKey}/executions,"фактическое число исполнений (независимая проверка D08)"
+GET,/admin/stats,"сводка: операций, исполнений, операций с повторным исполнением (должно быть 0), недоставленных результатов"
 ```
 
 ### POST /operations
@@ -76,10 +77,10 @@ responses[5]{code,body,meaning,app_action}
 
 ```
 faults[6]{mode,params,behaviour}
-unavailable,-,"любой запрос к /operations → 503; результаты не доставляются"
-lose_response,"{rate:1.0}","операция принимается и исполняется, но соединение рвётся до ответа"
+unavailable,-,"любой запрос к /operations → 503; исполнение и доставка результатов стоят; /admin работает"
+lose_response,"{rate:1.0, hangSeconds:15}","операция принимается и исполняется, а ответ не приходит: эмулятор держит соединение дольше таймаута клиента (таймаут app-api меньше hangSeconds)"
 duplicate_result,-,"каждый результат доставляется дважды с одним resultId"
-delay_result,"{seconds:10, reorder:true}","результаты задерживаются; при reorder ACCEPTED приходит после COMPLETED"
+delay_result,"{seconds:10, reorder:true}","результаты задерживаются на seconds; при reorder задерживается только ACCEPTED, и он приходит после итогового (seconds должен быть больше EXEC_DELAY_MS)"
 reject_content,"{marker:\"#reject\"}","операции с маркером в title → 422"
 fail_execution,"{marker:\"#fail\"}","операции с маркером исполняются с outcome=FAILED"
 ```

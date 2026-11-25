@@ -1,0 +1,41 @@
+name: exchange-test
+
+services:
+  app-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports: ["5442:5432"]
+    volumes: [app-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      retries: 30
+
+  # Отдельный сервер БД эмулятора: основное приложение не имеет к нему доступа (D08)
+  emulator-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: emulator
+      POSTGRES_USER: emulator
+      POSTGRES_PASSWORD: emulator
+    ports: ["5443:5432"]
+    volumes: [emulator-db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emulator -d emulator"]
+      interval: 2s
+      retries: 30
+
+  emulator:
+    build: ./emulator
+    environment:
+      DB_URL: jdbc:postgresql://emulator-db:5432/emulator
+    ports: ["4100:4100"]
+    depends_on:
+      emulator-db: { condition: service_healthy }
+
+volumes:
+  app-db:
+  emulator-db:

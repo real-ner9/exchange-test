@@ -44,7 +44,7 @@ CREATE TABLE result_outbox (
   version       int NOT NULL,
   outcome       text NOT NULL,
   callback_url  text NOT NULL,
-  body          jsonb NOT NULL,
+  executed_at   timestamptz,
   deliver_after timestamptz NOT NULL DEFAULT now(),
   delivered_at  timestamptz,
   attempts      int NOT NULL DEFAULT 0,
