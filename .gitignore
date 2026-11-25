@@ -6,3 +6,4 @@ coverage/
 *.log
 agent-sessions.zip
 agent-sessions/exports/
+.playwright-mcp/
