@@ -129,6 +129,11 @@ def main():
             local = m.group(0).split("@")[0]
             if m.group(0) not in ALLOWED_EMAILS and len(local) >= 5:
                 extra.add(local)
+    # Идентификаторы аккаунта и организации вычищаем и как значения внутри текста:
+    # они попадают в вывод команд и в пути к локальным файлам, а не только в одноимённые поля.
+    ids = re.compile(r'(?:accountUuid|organizationUuid|userID|orgId)\\*"\s*:\s*\\*"([0-9a-f-]{16,})')
+    for f in files:
+        extra.update(ids.findall(f.read_text(encoding="utf-8")))
     stats_out = {}
     totals = collections.Counter()
     with zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as z:
