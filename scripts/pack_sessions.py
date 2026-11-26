@@ -133,7 +133,8 @@ def main():
     # они попадают в вывод команд и в пути к локальным файлам, а не только в одноимённые поля.
     ids = re.compile(r'(?:accountUuid|organizationUuid|userID|orgId)\\*"\s*:\s*\\*"([0-9a-f-]{16,})')
     for f in files:
-        extra.update(ids.findall(f.read_text(encoding="utf-8")))
+        for found in ids.findall(f.read_text(encoding="utf-8")):
+            extra.update({found, found[:8]})  # и короткая форма: первые 8 символов тоже узнаваемы
     stats_out = {}
     totals = collections.Counter()
     with zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as z:
