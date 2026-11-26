@@ -30,7 +30,7 @@ DROP_TYPES = {"api-request-blob", "api-request", "api-request-shape", "data-flow
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 SECRETS = [
     (re.compile(r"(JSESSIONID[=\t ]+)[A-Za-z0-9._-]+"), r"\1<redacted>"),
-    (re.compile(r"\b(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,})"), "<redacted-token>"),
+    (re.compile(r"\b(sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,})"), "<redacted-token>"),
 ]
 ALLOWED_EMAILS = {"noreply@anthropic.com"}
 
